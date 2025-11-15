@@ -70,6 +70,7 @@ class Pilatus100k_OPLS(Pilatus100k):
             mask[bs[1]:, bs[0] - 8:bs[0] + 8] = False
             return np.logical_not(mask)
 
+
 class Pilatus300k_OPLS(Pilatus300k):
     '''
     Pilatus 100k class inherited from the pyFAI Pilatus1M class
