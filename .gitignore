@@ -1,0 +1,9 @@
+.DS_Store
+
+Detector.ipynb
+__pycache__
+integrate1D.ipynb
+remesh.ipynb
+stitch.ipynb
+xray_analysis.ipynb
+Xray_Scattering_General.ipynb
