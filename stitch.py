@@ -6,6 +6,7 @@
 import numpy as np
 import remesh
 
+
 def stitching(datas, ais, masks, geometry ='Reflection', interp_factor = 2, flag_scale = True, resc_q=False):
     '''
     Remeshing in q-space the 2D image collected by the pixel detector and stitching together images at different detector position (if several images)
