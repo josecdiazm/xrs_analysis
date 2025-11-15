@@ -485,7 +485,4 @@ def convert_user_azimuth_range(range_deg):
             # The long arc goes from mapped_start to mapped_end
             return [mapped_start, mapped_end]
 
-# %%
-
-
 
