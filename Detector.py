@@ -338,7 +338,6 @@ class rayonix(Detector):
                (self.name, self._pixel1, self._pixel2)
 
 
-
 class Rayonix(rayonix):
     MAX_SHAPE = (1920, 1920)
     aliases = ["rayonix"]
