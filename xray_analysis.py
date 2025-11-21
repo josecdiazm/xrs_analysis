@@ -11,6 +11,7 @@ import os
 import fabio
 import numpy as np
 import copy
+import tqdm
 
 
 class xray_geometry():
