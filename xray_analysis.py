@@ -103,7 +103,6 @@ class xray_geometry():
 
 
         self.imgs = []
-        self.masks = []
         self.ai = []
         self.det_angles = []
         self.cake = []
