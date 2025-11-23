@@ -104,7 +104,6 @@ class xray_geometry():
 
         self.imgs = []
         self.ai = []
-        self.det_angles = []
         self.cake = []
         self.inpaints, self.mask_inpaints = [], []
         self.img_st, self.mask_st = [], []
