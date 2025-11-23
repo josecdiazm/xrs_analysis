@@ -101,10 +101,21 @@ class xray_geometry():
         if self.detector is None:
             self.define_detector()
 
-        self.imgs = []
+
+        self.ai = []
         self.masks = []
+        self.cake = []
+        self.inpaints, self.mask_inpaints = [], []
+        self.img_st, self.mask_st = [], []
+        self.imgs = []
+        self.cake, self.q_cake, self.chi_cake = [], [], []
+        self.qp, self.qz = [], []
+        self.chi_azi, self.I_azi = [], []
+        self.q_hor, self.I_hor = [], []
+        self.q_ver, self.I_ver = [], []
+        self.q_rad, self.I_rad = [], []
         
-        
+
         if len(lst_img) != len(self.bs):
             self.bs = self.bs + [[0, 0]]*(len(lst_img) - len(self.bs))
 
