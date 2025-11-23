@@ -102,13 +102,13 @@ class xray_geometry():
             self.define_detector()
 
 
-        self.ai = []
+        self.imgs = []
         self.masks = []
+        self.ai = []
+        self.det_angles = []
         self.cake = []
         self.inpaints, self.mask_inpaints = [], []
         self.img_st, self.mask_st = [], []
-        self.imgs = []
-        self.cake, self.q_cake, self.chi_cake = [], [], []
         self.qp, self.qz = [], []
         self.chi_azi, self.I_azi = [], []
         self.q_hor, self.I_hor = [], []
