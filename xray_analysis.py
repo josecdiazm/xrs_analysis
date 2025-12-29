@@ -464,37 +464,36 @@ def convert_user_azimuth_range(range_deg):
     """
 
     # Assuming you want to keep your current function
-    def convert_user_azimuth_range(range_deg):
-        def map_angle(angle):
-            angle = angle % 360
-            if 0 <= angle <= 180:
-                return -angle
-            else:
-                return 360 - angle
-
-        start, end = map(lambda x: x % 360, range_deg)
-
-        # Ensure we're handling the wrap-around properly #New Comm
-        if start > end:
-            # Handle the wrap-around case
-            end += 360
-
-        # Normalize the mapped angles
-        mapped_start = map_angle(start)
-        mapped_end = map_angle(end)
-
-        # Logic follows as in your original function
-        # If input represents a full rotation case
-        if start == end:
-            return [-180, 180]
-
-        total_sweep = (end - start + 360) % 360
-        if total_sweep <= 180:
-            return [min(mapped_start, mapped_end), max(mapped_start, mapped_end)]
+    def map_angle(angle):
+        angle = angle % 360
+        if 0 <= angle <= 180:
+            return -angle
         else:
-            if mapped_start < mapped_end:
-                return [mapped_end, mapped_start]
-            else:
-                return [mapped_start, mapped_end]
+            return 360 - angle
+
+    start, end = map(lambda x: x % 360, range_deg)
+
+    # Ensure we're handling the wrap-around properly #New Comm
+    if start > end:
+        # Handle the wrap-around case
+        end += 360
+
+    # Normalize the mapped angles
+    mapped_start = map_angle(start)
+    mapped_end = map_angle(end)
+
+    # Logic follows as in your original function
+    # If input represents a full rotation case
+    if start == end:
+        return [-180, 180]
+
+    total_sweep = (end - start + 360) % 360
+    if total_sweep <= 180:
+        return [min(mapped_start, mapped_end), max(mapped_start, mapped_end)]
+    else:
+        if mapped_start < mapped_end:
+            return [mapped_end, mapped_start]
+        else:
+            return [mapped_start, mapped_end]
 
 
