@@ -453,47 +453,43 @@ class xray_geometry():
 
 def convert_user_azimuth_range(range_deg):
     """
+    Convert a range of azimuthal angles from a user-defined system (0° to 360°)
+    to the azimuthal range defined by pyFAI ([-π, π)).
+    
     User mapping:
-        0°  →  0°
-        90° → -90°
-        180° → -180°
-        270° → +90°
-        360° → 0°
+        0°  →  0
+        90° → -π/2
+        180° → -π
+        270° → π/2
+        360° → 0
     """
+    min_angle, max_angle = range_deg
 
-    # Function to map angles based on user mapping
-    def map_angle(angle):
-        angle = angle % 360
-        if 0 <= angle <= 180:
-            return -angle
-        else:
-            return 360 - angle
 
-    # Normalize the input range
-    start, end = map(lambda x: x % 360, range_deg)
+    def convert_angle(angle_deg):
+        # Normalize the angle to be in the range [0, 360)
+        angle_deg = angle_deg % 360
+        
+        if 0 < angle_deg <= 180:
+            return - angle_deg
+        
+        elif  angle_deg == 0:
+            return -180
+            
+        elif angle_deg > 180:
+            return 360 - angle_deg
+            
 
-    # Ensure we're handling the wrap-around properly
-    if start > end:
-        end += 360  # Wrap-around case
-
-    # Normalize the mapped angles
-    mapped_start = map_angle(start)
-    mapped_end = map_angle(end)
-
+    converted_min = convert_angle(min_angle)
+    converted_max = convert_angle(max_angle)
+    
     # Logic for full rotation case
-    if start == end:
+    if converted_max == converted_min:
         return [-180, 180]
 
-    total_sweep = (end - start + 360) % 360
-    if total_sweep <= 180:
-        result = [min(mapped_start, mapped_end), max(mapped_start, mapped_end)]
-    else:
-        result = [mapped_end, mapped_start] if mapped_start < mapped_end else [mapped_start, mapped_end]
+    elif converted_min > converted_max:
+        return (converted_max, converted_min)
 
-    # Check if the result is within the range -pi to pi
-    if result[0] < result[1]:
-        return result
     else:
-        # Reverse the order if not within range
-        return [result[1], result[0]]
+        return (converted_min, converted_max)
 
