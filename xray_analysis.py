@@ -497,12 +497,4 @@ def convert_user_azimuth_range(range_deg):
             else:
                 return [mapped_start, mapped_end]
 
-    # Define the azimuthal angle ranges
-    azimuth_ranges1 = [[220, 150]]
-
-    # Convert these ranges
-    azimuth_ranges = [convert_user_azimuth_range(r) for r in azimuth_ranges1]
-
-    print(azimuth_ranges)
-
 
