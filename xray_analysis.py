@@ -474,7 +474,7 @@ def convert_user_azimuth_range(range_deg):
 
         start, end = map(lambda x: x % 360, range_deg)
 
-        # Ensure we're handling the wrap-around properly
+        # Ensure we're handling the wrap-around properly #New
         if start > end:
             # Handle the wrap-around case
             end += 360
