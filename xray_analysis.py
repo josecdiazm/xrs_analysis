@@ -463,39 +463,46 @@ def convert_user_azimuth_range(range_deg):
         360° → 0°
     """
 
-    def map_angle(angle):
-        """Map a single user angle to the modified azimuth convention."""
-        angle = angle % 360
-        if 0 <= angle <= 180:
-            return -angle
-        else:  # 180 < angle < 360
-            return 360 - angle
+    # Assuming you want to keep your current function
+    def convert_user_azimuth_range(range_deg):
+        def map_angle(angle):
+            angle = angle % 360
+            if 0 <= angle <= 180:
+                return -angle
+            else:
+                return 360 - angle
 
-    # Normalize start and end angles
-    start, end = map(lambda x: x % 360, range_deg)
+        start, end = map(lambda x: x % 360, range_deg)
 
-    # If input represents a full rotation case
-    if start == end:
-        return [-180, 180]
+        # Ensure we're handling the wrap-around properly
+        if start > end:
+            # Handle the wrap-around case
+            end += 360
 
-    # Map start and end angles
-    mapped_start = map_angle(start)
-    mapped_end = map_angle(end)
+        # Normalize the mapped angles
+        mapped_start = map_angle(start)
+        mapped_end = map_angle(end)
 
-    # Determine the arc direction.
-    total_sweep = (end - start + 360) % 360
-    if total_sweep <= 180:
-        # Clockwise small arc
-        return [min(mapped_start, mapped_end), max(mapped_start, mapped_end)]
-    else:
-        # Counter-clockwise large arc
-        # When we need a long arc, we essentially invert our selection.
-        # Here we calculate the 'opposite' case.
-        if mapped_start < mapped_end:
-            # The long arc goes from the mapped_end to mapped_start
-            return [mapped_end, mapped_start]
+        # Logic follows as in your original function
+        # If input represents a full rotation case
+        if start == end:
+            return [-180, 180]
+
+        total_sweep = (end - start + 360) % 360
+        if total_sweep <= 180:
+            return [min(mapped_start, mapped_end), max(mapped_start, mapped_end)]
         else:
-            # The long arc goes from mapped_start to mapped_end
-            return [mapped_start, mapped_end]
+            if mapped_start < mapped_end:
+                return [mapped_end, mapped_start]
+            else:
+                return [mapped_start, mapped_end]
+
+    # Define the azimuthal angle ranges
+    azimuth_ranges1 = [[220, 150]]
+
+    # Convert these ranges
+    azimuth_ranges = [convert_user_azimuth_range(r) for r in azimuth_ranges1]
+
+    print(azimuth_ranges)
 
 
