@@ -491,8 +491,28 @@ def convert_user_azimuth_range(range_deg):
     # Total sweep
     total_sweep = (end - start + 360) % 360
     if total_sweep <= 180:
-        return [min(mapped_start, mapped_end), max(mapped_start, mapped_end)]
+        result = [min(mapped_start, mapped_end), max(mapped_start, mapped_end)]
     else:
-        return [max(mapped_start, mapped_end), min(mapped_start, mapped_end)]
+        result = [max(mapped_start, mapped_end), min(mapped_start, mapped_end)]
+
+    # Convert results to radians and normalize
+    return prepare_azimuth_range_for_pyFAI(result)
+
+def prepare_azimuth_range_for_pyFAI(az_range):
+    # Convert to radians
+    rad_range = [(angle * np.pi / 180) for angle in az_range]
+
+    # Normalize angles to be in the range of [-π, π)
+    normalized_range = [(angle + 2 * np.pi) if angle < -np.pi else angle for angle in rad_range]
+    normalized_range = [(angle - 2 * np.pi) if angle >= np.pi else angle for angle in normalized_range]
+
+    start, end = normalized_range
+
+    # Check if the range is reversed
+    if start > end:
+        # Swap the values
+        start, end = end, start
+
+    return [start, end]
 
 
