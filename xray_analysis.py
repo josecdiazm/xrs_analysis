@@ -450,14 +450,20 @@ class xray_geometry():
                                                             )
 
 
-import numpy as np
 
 def convert_user_azimuth_range(range_deg):
     """
     Convert angles [0, 360) in user coordinates to modified azimuth convention,
     preserving the long arcs from start to end.
+
+    User mapping:
+        0°  →  0°
+        90° → -90°
+        180° → -180°
+        270° → +90°
+        360° → 0°
     """
-    
+
     def map_angle(angle):
         angle = angle % 360
         if 0 <= angle <= 180:
@@ -475,18 +481,22 @@ def convert_user_azimuth_range(range_deg):
     mapped_start = map_angle(start)
     mapped_end = map_angle(end)
 
-    # Return directly if it represents a full rotation
+    # Adjust ranges for pyFAI compatibility
+    if mapped_start > mapped_end:
+        mapped_end += 360  # Ensure it wraps around correctly for `pyFAI`
+
+    # If input represents a full rotation case
     if start == end:
         return [-180, 180]
 
     # Total sweep
     total_sweep = (end - start + 360) % 360
-
     if total_sweep <= 180:
         result = [min(mapped_start, mapped_end), max(mapped_start, mapped_end)]
     else:
         result = [max(mapped_start, mapped_end), min(mapped_start, mapped_end)]
 
+    # Convert results to radians and normalize
     return prepare_azimuth_range_for_pyFAI(result)
 
 def prepare_azimuth_range_for_pyFAI(az_range):
@@ -494,17 +504,15 @@ def prepare_azimuth_range_for_pyFAI(az_range):
     rad_range = [(angle * np.pi / 180) for angle in az_range]
 
     # Normalize angles to be in the range of [-π, π)
-    normalized_start = (rad_range[0] + 2 * np.pi) if rad_range[0] < -np.pi else rad_range[0]
-    normalized_start = (normalized_start - 2 * np.pi) if normalized_start >= np.pi else normalized_start
-    
-    normalized_end = (rad_range[1] + 2 * np.pi) if rad_range[1] < -np.pi else rad_range[1]
-    normalized_end = (normalized_end - 2 * np.pi) if normalized_end >= np.pi else normalized_end
+    normalized_range = [(angle + 2 * np.pi) if angle < -np.pi else angle for angle in rad_range]
+    normalized_range = [(angle - 2 * np.pi) if angle >= np.pi else angle for angle in normalized_range]
+
+    start, end = normalized_range
 
     # Check if the range is reversed
-    if normalized_start > normalized_end:
-        # Swap values
-        normalized_start, normalized_end = normalized_end, normalized_start
+    if start > end:
+        # Swap the values
+        start, end = end, start
 
-    return [normalized_start, normalized_end]
-
+    return [start, end]
 
