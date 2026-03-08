@@ -210,7 +210,7 @@ class xray_geometry():
 
         for i, det_rot in enumerate(det_rots):
             ai_temp = copy.deepcopy(ai)
-            ai_temp.set_rot1(det_rot)
+            ai_temp.set_rot1 = det_rot
             self.ai.append(ai_temp)
 
 
@@ -221,7 +221,7 @@ class xray_geometry():
 
         for i, det_rot in enumerate(det_rots):
             ai_temp = copy.deepcopy(ai)
-            ai_temp.set_rot1(det_rot)
+            ai_temp.set_rot1 = det_rot
             ai_temp.set_incident_angle(self.alphai)
             self.ai.append(ai_temp)
 
@@ -239,7 +239,7 @@ class xray_geometry():
 
         for i, det_rot in enumerate(det_rots):
             ai_temp = copy.deepcopy(ai)
-            ai_temp.set_rot1(det_rot)
+            ai_temp.set_rot1 = det_rot
             self.ai.append(ai_temp)
 
 
