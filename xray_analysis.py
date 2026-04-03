@@ -103,7 +103,7 @@ class xray_geometry():
 
 
         self.imgs = []
-        self.ai = []
+        # self.ai = []
         self.cake = []
         self.inpaints, self.mask_inpaints = [], []
         self.img_st, self.mask_st = [], []
@@ -246,29 +246,37 @@ class xray_geometry():
     def stitching_data(self, flag_scale=True, interp_factor=1):
         self.img_st, self.qp, self.qz = [], [], []
 
-        if self.ai == []:
+        # Only build the integrator if it has not been built yet, or if the number
+        # of images has changed (which happens when switching between single-image
+        # and multi-angle stitching modes). In normal batch processing over many
+        # files of the same type, self.ai is built once and reused every call.
+        n_expected = len(self.imgs)
+        if self.ai == [] or len(self.ai) != n_expected:
+            # Also invalidate the q-range cache if the number of images changed,
+            # because q_p_ini shape depends on how many detectors are being stitched.
+            if len(self.ai) != n_expected:
+                self._qranges_cache = None
+
+            self.ai = []
+
             if len(self.det_angles) != len(self.imgs):
                 if self.detector != 'Pilatus900kw':
-                    if len(self.det_angles) !=0 and len(self.det_angles) > len(self.imgs):
+                    if len(self.det_angles) != 0 and len(self.det_angles) > len(self.imgs):
                         raise Exception('The number of angle for the %s is not good. '
                                         'There is %s images but %s angles' % (self.detector,
-                                                                              int(len(self.imgs)),
-                                                                              len(self.det_angles)))
-
+                                                                            int(len(self.imgs)),
+                                                                            len(self.det_angles)))
                     self.det_angles = [self.det_ini_angle + i * self.det_angle_step
-                                       for i in range(0, len(self.imgs), 1)]
-
+                                    for i in range(0, len(self.imgs), 1)]
                 else:
                     if len(self.det_angles) == 0:
                         self.det_angles = [self.det_ini_angle + i * self.det_angle_step
-                                           for i in range(0, int(len(self.imgs)//3), 1)]
-
-                    if 3*len(self.det_angles) != len(self.imgs):
+                                        for i in range(0, int(len(self.imgs) // 3), 1)]
+                    if 3 * len(self.det_angles) != len(self.imgs):
                         raise Exception('The number of angle for the %s is not good. '
                                         'There is %s images but %s angles' % (self.detector,
-                                                                              int(len(self.imgs)//3),
-                                                                              len(self.det_angles)))
-
+                                                                            int(len(self.imgs) // 3),
+                                                                            len(self.det_angles)))
                     angles = []
                     for angle in self.det_angles:
                         angles = angles + [angle - np.deg2rad(7.47), angle, angle + np.deg2rad(7.47)]
@@ -283,13 +291,23 @@ class xray_geometry():
             else:
                 raise Exception('Unknown geometry: should be either Transmission or Reflection')
 
-        self.img_st, self.mask_st, self.qp, self.qz, self.scales = stitch.stitching(self.imgs,
-                                                                                    self.ai,
-                                                                                    self.masks,
-                                                                                    self.geometry,
-                                                                                    flag_scale=flag_scale,
-                                                                                    interp_factor=interp_factor
-                                                                                    )
+        # Pass the cached q-ranges into stitching() if we have them.
+        # On the first call _qranges_cache does not exist, so getattr returns None
+        # and stitching() runs the full scout pass and returns the ranges.
+        # On every subsequent call with the same number of images and same geometry,
+        # those ranges are passed back in and the scout pass is skipped entirely.
+        result = stitch.stitching(self.imgs,
+                                self.ai,
+                                self.masks,
+                                self.geometry,
+                                flag_scale=flag_scale,
+                                interp_factor=interp_factor,
+                                _cached_qranges=getattr(self, '_qranges_cache', None))
+
+        self.img_st, self.mask_st, self.qp, self.qz, self.scales, qranges = result
+
+        # Store the q-ranges for all future calls with matching configuration
+        self._qranges_cache = qranges
 
         if len(self.scales) == 1 or not flag_scale:
             pass
