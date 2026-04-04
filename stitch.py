@@ -28,13 +28,7 @@ def stitching(datas, ais, masks, geometry='Reflection', interp_factor=2,
     '''
 
     if _cached_qranges is None:
-        # -----------------------------------------------------------------------
-        # SCOUT PASS: run remesh once per image just to find the q-space extent
-        # and the per-image q-ranges needed for stitching overlap calculation.
-        # This only runs on the very first call for a given geometry setup.
-        # For fixed geometry (same detector, SDD, beam center, wavelength, alphai)
-        # the result is identical every time, so we cache and skip it after.
-        # -----------------------------------------------------------------------
+        # Scout pass — same as before
         for i, (data, ai, mask) in enumerate(zip(datas, ais, masks)):
             if geometry == 'Reflection':
                 img, x, y = remesh.remesh_gi(data, ai, method='splitbbox', mask=mask)
@@ -65,53 +59,69 @@ def stitching(datas, ais, masks, geometry='Reflection', interp_factor=2,
                 abs(max(q_p_ini[:, -1]) - min(q_p_ini[:, 0])))
         )
 
+        # -------------------------------------------------------------------
+        # Remesh the masks once here during the scout pass and cache them.
+        # The mask only depends on geometry and beamstop position, not on the
+        # image data, so it is identical for every file in a batch run.
+        # -------------------------------------------------------------------
+        cached_qmasks = []
+        for i, (ai, mask) in enumerate(zip(ais, masks)):
+            qp_start = np.argmin(abs(qp_remesh - np.min(q_p_ini[:, i])))
+            qp_stop  = np.argmin(abs(qp_remesh - np.max(q_p_ini[:, i])))
+            npt = (int(qp_stop - qp_start), int(np.shape(qz_remesh)[0]))
+
+            if geometry == 'Reflection':
+                ip_range = (-qp_remesh[qp_stop], -qp_remesh[qp_start])
+                op_range = (qz_remesh[0], qz_remesh[-1])
+                msk, _, _ = remesh.remesh_gi(mask.astype(int), ai, npt=npt,
+                                            q_h_range=ip_range, q_v_range=op_range,
+                                            method='splitbbox', mask=mask)
+                cached_qmasks.append(np.rot90(msk, 2))
+
+            elif geometry == 'Transmission':
+                ip_range = (qp_remesh[qp_start], qp_remesh[qp_stop])
+                op_range = (qz_remesh[0], qz_remesh[-1])
+                qmask, _, _, _ = remesh.remesh_transmission(mask.astype(int), ai, bins=npt,
+                                                            q_h_range=ip_range, q_v_range=op_range,
+                                                            mask=None)
+                cached_qmasks.append(qmask)
+
     else:
-        # -----------------------------------------------------------------------
-        # CACHED PATH: geometry hasn't changed, reuse everything from last time.
-        # This saves the entire scout remesh pass (~half of total stitching time).
-        # q_p_ini and q_z_ini are also cached because they are needed to compute
-        # the per-image qp_start/qp_stop overlap positions during stitching,
-        # and those positions depend only on the detector angles, not the data.
-        # -----------------------------------------------------------------------
-        qp_remesh = _cached_qranges['qp_remesh']
-        qz_remesh = _cached_qranges['qz_remesh']
-        q_p_ini   = _cached_qranges['q_p_ini']
-        q_z_ini   = _cached_qranges['q_z_ini']
+        # Cached path — restore everything including the pre-remeshed masks
+        qp_remesh      = _cached_qranges['qp_remesh']
+        qz_remesh      = _cached_qranges['qz_remesh']
+        q_p_ini        = _cached_qranges['q_p_ini']
+        q_z_ini        = _cached_qranges['q_z_ini']
+        cached_qmasks  = _cached_qranges['qmasks']
 
     # ---------------------------------------------------------------------------
     # MAIN PASS: remesh each image onto the target q-grid and stitch.
-    # This part always runs because it depends on the image data.
+    # The mask remesh is now skipped here entirely — we use the cached version.
     # ---------------------------------------------------------------------------
     for i, (data, ai, mask) in enumerate(zip(datas, ais, masks)):
 
-        # Compute where this image sits on the shared q-grid.
-        # For a single image this is always the full range.
-        # For multi-angle stitching each image occupies a different sub-range.
         qp_start = np.argmin(abs(qp_remesh - np.min(q_p_ini[:, i])))
         qp_stop  = np.argmin(abs(qp_remesh - np.max(q_p_ini[:, i])))
         npt = (int(qp_stop - qp_start), int(np.shape(qz_remesh)[0]))
 
+        # Use the cached remeshed mask instead of recomputing it
+        qmask = cached_qmasks[i]
+
         if geometry == 'Reflection':
             ip_range = (-qp_remesh[qp_stop], -qp_remesh[qp_start])
             op_range = (qz_remesh[0], qz_remesh[-1])
-            msk, _, _ = remesh.remesh_gi(mask.astype(int), ai, npt=npt,
-                                         q_h_range=ip_range, q_v_range=op_range,
-                                         method='splitbbox', mask=mask)
             img, x, y = remesh.remesh_gi(data, ai, npt=npt,
-                                         q_h_range=ip_range, q_v_range=op_range,
-                                         method='splitbbox', mask=mask)
-            qimage, qmask = np.rot90(img, 2), np.rot90(msk, 2)
+                                        q_h_range=ip_range, q_v_range=op_range,
+                                        method='splitbbox', mask=mask)
+            qimage = np.rot90(img, 2)
             qp, qz = -x[::-1], y[::-1]
 
         elif geometry == 'Transmission':
             ip_range = (qp_remesh[qp_start], qp_remesh[qp_stop])
             op_range = (qz_remesh[0], qz_remesh[-1])
-            qmask, _, _, _ = remesh.remesh_transmission(mask.astype(int), ai, bins=npt,
-                                                        q_h_range=ip_range, q_v_range=op_range,
-                                                        mask=None)
             qimage, x, y, resc_q = remesh.remesh_transmission(data, ai, bins=npt,
-                                                               q_h_range=ip_range, q_v_range=op_range,
-                                                               mask=mask)
+                                                            q_h_range=ip_range, q_v_range=op_range,
+                                                            mask=mask)
 
         if i == 0:
             img_te   = np.zeros((np.shape(qz_remesh)[0], np.shape(qp_remesh)[0]))
@@ -194,14 +204,12 @@ def stitching(datas, ais, masks, geometry='Reflection', interp_factor=2,
         qp_out[:] = [v * 10 for v in qp_out]
         qz_out[:] = [v * 10 for v in qz_out]
 
-    # Bundle everything the caller needs to skip the scout pass next time.
-    # q_p_ini and q_z_ini are included because they encode the per-image
-    # q-space positions which depend on detector angles, not image data.
     cached_qranges = {
         'qp_remesh': qp_remesh,
         'qz_remesh': qz_remesh,
         'q_p_ini':   q_p_ini,
         'q_z_ini':   q_z_ini,
+        'qmasks':    cached_qmasks,   # <-- now included
     }
 
     return img, mask_out, qp_out, qz_out, scales, cached_qranges
