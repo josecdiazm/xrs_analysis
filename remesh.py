@@ -391,6 +391,3 @@ def phi(x, y, z):
 # return np.arctan2(x, np.sqrt(z ** 2))
 # %%
 
-
-
-%%
