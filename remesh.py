@@ -102,7 +102,7 @@ def remesh_gi(data, ai, npt=None, q_h_range=None, q_v_range=None, method='splitb
         unit_oop="qoop_A^-1",
         ip_range=q_h_range,
         oop_range=q_v_range,
-        method='bbox', #splitpix is used by Fiber integrator
+        method='splitpix', #splitpix is used by Fiber integrator
         mask=mask
     )
 
