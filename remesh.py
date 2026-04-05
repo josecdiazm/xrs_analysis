@@ -5,58 +5,11 @@
 import numpy as np
 from pyFAI.ext import splitBBox
 
-# ---------------------------------------------------------------------------
-# Module-level LUT cache for FiberIntegrator objects.
-# Keys are the id() of the AzimuthalIntegrator/Transform object.
-# Values are the promoted FiberIntegrator instances.
-# The LUT inside each FiberIntegrator is built on the first integrate2d call
-# and then reused automatically by pyFAI on all subsequent calls, giving
-# ~9x speedup from the second call onward (~2s -> ~0.2s per image).
-# ---------------------------------------------------------------------------
-_fi_cache = {}
-
-
-def _get_fiber_integrator(ai, incident_angle=0.0, tilt_angle=0.0, sample_orientation=4):
-    """
-    Return a FiberIntegrator for the given ai object, creating and caching
-    it on first access. Subsequent calls with the same ai object return the
-    cached instance instantly without any recomputation.
-
-    Parameters:
-    -----------
-    :param ai: pyGIX Transform or pyFAI AzimuthalIntegrator
-    :param incident_angle: incident angle in radians
-    :param tilt_angle: tilt angle in radians
-    :param sample_orientation: pyGIX sample orientation integer (1-4)
-    """
-    cache_key = id(ai)
-    if cache_key not in _fi_cache:
-        try:
-            fi = ai.promote(type_="pyFAI.integrator.fiber.FiberIntegrator")
-        except AttributeError:
-            # Fallback for integrator objects that do not support promote()
-            from pyFAI.integrator.fiber import FiberIntegrator
-            fi = FiberIntegrator(dist=ai.dist,
-                                 poni1=ai.poni1,
-                                 poni2=ai.poni2,
-                                 rot1=ai.rot1,
-                                 rot2=ai.rot2,
-                                 rot3=ai.rot3,
-                                 wavelength=ai.wavelength,
-                                 detector=ai.detector)
-        _fi_cache[cache_key] = fi
-    return _fi_cache[cache_key]
-
 
 def remesh_gi(data, ai, npt=None, q_h_range=None, q_v_range=None, method='splitbbox', mask=None,
               incident_angle=0.0, tilt_angle=0.0, sample_orientation=4):
     """
-    Redraw the Grazing-Incidence image in (qp, qz) coordinates using pyGIX.
-
-    Uses pyFAI's FiberIntegrator with persistent LUT caching instead of
-    calling ai.transform_reciprocal() directly. The LUT is built once on the
-    first call per integrator object (~2s) and reused on all subsequent calls
-    (~0.2s), giving ~9x speedup across a batch of images with fixed geometry.
+    Redraw the Grazing-Incidence image in (qp, qz) coordinates using pyGIX
 
     Parameters:
     -----------
@@ -64,50 +17,33 @@ def remesh_gi(data, ai, npt=None, q_h_range=None, q_v_range=None, method='splitb
     :type data: numpy 2D array of float
     :param ai: pyGIX transform operator
     :type ai: pyGIXTransform operator
-    :param npt: number of points for the binning, as (npt_ip, npt_oop) tuple
-    :type npt: tuple of int, optional
+    :param npt: number of point for the binning
+    :type npt: int
     :param q_h_range: Starting and ending point for the q_horizontal range
     :type q_h_range: Tuple(float, float), optional
     :param q_v_range: Starting and ending point for the q_vertical range
     :type q_v_range: Tuple(float, float), optional
-    :param method: kept for API compatibility, FiberIntegrator uses 'splitpix' internally
-    :type method: string
+    :param method: Method for the remeshing
+    :type method: String: 'splitbbox', ...
     :param mask: Mask of the 2D raw image
     :type mask: numpy 2D array of boolean
-    :param incident_angle: grazing incident angle in radians
+    :param incident_angle: kept for API compatibility with stitch.py and xray_analysis.py
     :type incident_angle: float
-    :param tilt_angle: tilt angle in radians
+    :param tilt_angle: kept for API compatibility with stitch.py and xray_analysis.py
     :type tilt_angle: float
-    :param sample_orientation: pyGIX sample orientation integer (1-4)
+    :param sample_orientation: kept for API compatibility with stitch.py and xray_analysis.py
     :type sample_orientation: int
     """
-    fi = _get_fiber_integrator(ai, incident_angle=incident_angle,
-                               tilt_angle=tilt_angle,
-                               sample_orientation=sample_orientation)
 
-    if npt is None:
-        npt_ip  = data.shape[1]
-        npt_oop = data.shape[0]
-    else:
-        npt_ip, npt_oop = int(npt[0]), int(npt[1])
+    img, q_par, q_ver = ai.transform_reciprocal(data,
+                                                npt=npt,
+                                                ip_range=q_h_range,
+                                                op_range=q_v_range,
+                                                method=method,
+                                                unit='A',
+                                                mask=mask)
 
-    result = fi.integrate2d_grazing_incidence(
-        data=data.astype(float),
-        npt_ip=npt_ip,
-        npt_oop=npt_oop,
-        sample_orientation=sample_orientation,
-        incident_angle=incident_angle,
-        tilt_angle=tilt_angle,
-        unit_ip="qip_A^-1",
-        unit_oop="qoop_A^-1",
-        ip_range=q_h_range,
-        oop_range=q_v_range,
-        method='splitpix', #splitpix is used by Fiber integrator
-        mask=mask
-    )
-
-    intensity, q_ip, q_oop = result
-    return np.flipud(intensity), q_ip, q_oop
+    return img, q_par, q_ver
 
 
 def remesh_transmission(image, ai, bins=None, q_h_range=None, q_v_range=None, mask=None):
@@ -228,6 +164,9 @@ def phi(x, y, z):
     :type z: ndarray
     """
     return np.arctan2(x, np.sqrt(z ** 2))
+
+
+# %%
 
 # %%
 
