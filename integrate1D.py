@@ -271,6 +271,7 @@ def integrate_qper(img, q_par, q_per, q_par_range=None, q_per_range=None):
 
 
 # TODO: Implement azimuthal integration for GI
+
 def cake_gisaxs(img, q_par, q_per, bins=None, radial_range=None, azimuth_range=None):
     """
     Unwrap the stitched image from q-space to 2theta-Chi space (Radial-Azimuthal angle)

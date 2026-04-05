@@ -8,7 +8,8 @@ import remesh
 
 
 def stitching(datas, ais, masks, geometry='Reflection', interp_factor=2,
-              flag_scale=True, resc_q=False, _cached_qranges=None):
+              flag_scale=True, resc_q=False, _cached_qranges=None,
+              incident_angle=0.0, tilt_angle=0.0, sample_orientation=4):
     '''
     Remeshing in q-space the 2D image collected by the pixel detector and stitching together
     images at different detector position (if several images).
@@ -22,16 +23,32 @@ def stitching(datas, ais, masks, geometry='Reflection', interp_factor=2,
     :param interp_factor: factor to increase the binning of the stitched image
     :param flag_scale: Boolean to scale consecutive images at different detector positions
     :param resc_q: Rescale qs (fix for pyFAI bug when qs exceed pi)
-    :param _cached_qranges: dict with keys 'qp_remesh', 'qz_remesh', and 'q_p_ini', 'q_z_ini'
-                            from a previous call with the same geometry/detector configuration.
-                            If provided, the expensive scout remesh pass is skipped entirely.
+    :param _cached_qranges: dict with keys 'qp_remesh', 'qz_remesh', 'q_p_ini', 'q_z_ini',
+                            and 'qmasks' from a previous call with the same geometry/detector
+                            configuration. If provided, the expensive scout remesh pass and
+                            mask remesh are skipped entirely.
+    :param incident_angle: grazing incident angle in radians (Reflection geometry only)
+    :type incident_angle: float
+    :param tilt_angle: tilt angle in radians (Reflection geometry only)
+    :type tilt_angle: float
+    :param sample_orientation: pyGIX sample orientation integer 1-4 (Reflection geometry only)
+    :type sample_orientation: int
     '''
 
     if _cached_qranges is None:
-        # Scout pass — same as before
+        # -----------------------------------------------------------------------
+        # SCOUT PASS: run remesh once per image just to find the q-space extent
+        # and the per-image q-ranges needed for stitching overlap calculation.
+        # This only runs on the very first call for a given geometry setup.
+        # For fixed geometry (same detector, SDD, beam center, wavelength, alphai)
+        # the result is identical every time, so we cache and skip it after.
+        # -----------------------------------------------------------------------
         for i, (data, ai, mask) in enumerate(zip(datas, ais, masks)):
             if geometry == 'Reflection':
-                img, x, y = remesh.remesh_gi(data, ai, method='splitbbox', mask=mask)
+                img, x, y = remesh.remesh_gi(data, ai, method='splitbbox', mask=mask,
+                                             incident_angle=incident_angle,
+                                             tilt_angle=tilt_angle,
+                                             sample_orientation=sample_orientation)
                 if i == 0:
                     q_p_ini = np.zeros((np.shape(x)[0], len(datas)))
                     q_z_ini = np.zeros((np.shape(y)[0], len(datas)))
@@ -74,8 +91,11 @@ def stitching(datas, ais, masks, geometry='Reflection', interp_factor=2,
                 ip_range = (-qp_remesh[qp_stop], -qp_remesh[qp_start])
                 op_range = (qz_remesh[0], qz_remesh[-1])
                 msk, _, _ = remesh.remesh_gi(mask.astype(int), ai, npt=npt,
-                                            q_h_range=ip_range, q_v_range=op_range,
-                                            method='splitbbox', mask=mask)
+                                             q_h_range=ip_range, q_v_range=op_range,
+                                             method='splitbbox', mask=mask,
+                                             incident_angle=incident_angle,
+                                             tilt_angle=tilt_angle,
+                                             sample_orientation=sample_orientation)
                 cached_qmasks.append(np.rot90(msk, 2))
 
             elif geometry == 'Transmission':
@@ -87,12 +107,18 @@ def stitching(datas, ais, masks, geometry='Reflection', interp_factor=2,
                 cached_qmasks.append(qmask)
 
     else:
-        # Cached path — restore everything including the pre-remeshed masks
-        qp_remesh      = _cached_qranges['qp_remesh']
-        qz_remesh      = _cached_qranges['qz_remesh']
-        q_p_ini        = _cached_qranges['q_p_ini']
-        q_z_ini        = _cached_qranges['q_z_ini']
-        cached_qmasks  = _cached_qranges['qmasks']
+        # -----------------------------------------------------------------------
+        # CACHED PATH: geometry hasn't changed, reuse everything from last time.
+        # This saves the entire scout remesh pass and mask remesh pass.
+        # q_p_ini and q_z_ini are also cached because they are needed to compute
+        # the per-image qp_start/qp_stop overlap positions during stitching,
+        # and those positions depend only on the detector angles, not the data.
+        # -----------------------------------------------------------------------
+        qp_remesh     = _cached_qranges['qp_remesh']
+        qz_remesh     = _cached_qranges['qz_remesh']
+        q_p_ini       = _cached_qranges['q_p_ini']
+        q_z_ini       = _cached_qranges['q_z_ini']
+        cached_qmasks = _cached_qranges['qmasks']
 
     # ---------------------------------------------------------------------------
     # MAIN PASS: remesh each image onto the target q-grid and stitch.
@@ -111,8 +137,11 @@ def stitching(datas, ais, masks, geometry='Reflection', interp_factor=2,
             ip_range = (-qp_remesh[qp_stop], -qp_remesh[qp_start])
             op_range = (qz_remesh[0], qz_remesh[-1])
             img, x, y = remesh.remesh_gi(data, ai, npt=npt,
-                                        q_h_range=ip_range, q_v_range=op_range,
-                                        method='splitbbox', mask=mask)
+                                         q_h_range=ip_range, q_v_range=op_range,
+                                         method='splitbbox', mask=mask,
+                                         incident_angle=incident_angle,
+                                         tilt_angle=tilt_angle,
+                                         sample_orientation=sample_orientation)
             qimage = np.rot90(img, 2)
             qp, qz = -x[::-1], y[::-1]
 
@@ -120,8 +149,8 @@ def stitching(datas, ais, masks, geometry='Reflection', interp_factor=2,
             ip_range = (qp_remesh[qp_start], qp_remesh[qp_stop])
             op_range = (qz_remesh[0], qz_remesh[-1])
             qimage, x, y, resc_q = remesh.remesh_transmission(data, ai, bins=npt,
-                                                            q_h_range=ip_range, q_v_range=op_range,
-                                                            mask=mask)
+                                                               q_h_range=ip_range, q_v_range=op_range,
+                                                               mask=mask)
 
         if i == 0:
             img_te   = np.zeros((np.shape(qz_remesh)[0], np.shape(qp_remesh)[0]))
@@ -209,7 +238,7 @@ def stitching(datas, ais, masks, geometry='Reflection', interp_factor=2,
         'qz_remesh': qz_remesh,
         'q_p_ini':   q_p_ini,
         'q_z_ini':   q_z_ini,
-        'qmasks':    cached_qmasks,   # <-- now included
+        'qmasks':    cached_qmasks,
     }
 
     return img, mask_out, qp_out, qz_out, scales, cached_qranges
@@ -252,6 +281,3 @@ def translation_stitching(datas, masks=None, pys=None, pxs=None):
 
 
 # %%
-
-
-

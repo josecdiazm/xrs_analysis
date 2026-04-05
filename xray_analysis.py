@@ -82,7 +82,6 @@ class xray_geometry():
             self.det = Detector.Pilatus300k_OPLS()
         elif self.detector == 'Pilatus800k_CMS':
             self.det = Detector.Pilatus800k_CMS()
-            
         elif self.detector == 'Eiger2_1M':
             self.det = Detector.Eiger2_1M()
         else:
@@ -101,18 +100,20 @@ class xray_geometry():
         if self.detector is None:
             self.define_detector()
 
-
         self.imgs = []
-        # self.ai = []
+        # self.ai is intentionally NOT reset here. The integrator depends only on
+        # geometry (detector, SDD, beam center, wavelength, alphai), which does not
+        # change between images. Resetting it here was forcing an expensive rebuild
+        # on every single open_data() call. It is now built once and reused.
         self.cake = []
         self.inpaints, self.mask_inpaints = [], []
         self.img_st, self.mask_st = [], []
+        self.masks = []         # masks are reset because bs_pos can vary per image
         self.qp, self.qz = [], []
         self.chi_azi, self.I_azi = [], []
         self.q_hor, self.I_hor = [], []
         self.q_ver, self.I_ver = [], []
         self.q_rad, self.I_rad = [], []
-        
 
         if len(lst_img) != len(self.bs):
             self.bs = self.bs + [[0, 0]]*(len(lst_img) - len(self.bs))
@@ -126,12 +127,10 @@ class xray_geometry():
                     self.masks.append(masks[:, -195:])
                 else:
                     self.masks.append(self.det.calc_mask(bs=bs, bs_kind=self.bs_kind, optional_mask=optional_mask))
-            
 
             if self.detector == 'Pilatus1m' or self.detector == 'Pilatus2m':
                 self.imgs.append(fabio.open(os.path.join(path, img)).data)
             elif self.detector == 'Pilatus900kw':
-                # self.imgs.append(np.rot90(fabio.open(os.path.join(path, img)).data, 1))
                 self.imgs.append(np.rot90(fabio.open(os.path.join(path, img)).data, 1)[:, :195])
                 self.imgs.append(np.rot90(fabio.open(os.path.join(path, img)).data, 1)[:, 212:212 + 195])
                 self.imgs.append(np.rot90(fabio.open(os.path.join(path, img)).data, 1)[:, -195:])
@@ -243,8 +242,27 @@ class xray_geometry():
             self.ai.append(ai_temp)
 
 
-    def stitching_data(self, flag_scale=True, interp_factor=1):
+    def stitching_data(self, flag_scale=True, interp_factor=1,
+                       incident_angle=None, tilt_angle=0.0, sample_orientation=4):
+        """
+        Remesh and stitch the loaded images into a single q-space map.
+
+        Parameters:
+        -----------
+        :param flag_scale: Boolean to scale consecutive images at different detector positions
+        :param interp_factor: factor to increase the binning of the stitched image
+        :param incident_angle: grazing incident angle in radians (Reflection geometry only).
+                               Defaults to self.alphai stored from __init__ if not provided.
+        :param tilt_angle: tilt angle in radians (Reflection geometry only)
+        :param sample_orientation: pyGIX sample orientation integer 1-4 (Reflection geometry only)
+        """
         self.img_st, self.qp, self.qz = [], [], []
+
+        # Derive incident_angle from stored alphai if not explicitly provided.
+        # self.alphai is stored in degrees (converted in __init__ via np.rad2deg(-alphai)),
+        # so we convert back to radians here for passing to remesh/FiberIntegrator.
+        if incident_angle is None:
+            incident_angle = np.deg2rad(-self.alphai)
 
         # Only build the integrator if it has not been built yet, or if the number
         # of images has changed (which happens when switching between single-image
@@ -264,19 +282,19 @@ class xray_geometry():
                     if len(self.det_angles) != 0 and len(self.det_angles) > len(self.imgs):
                         raise Exception('The number of angle for the %s is not good. '
                                         'There is %s images but %s angles' % (self.detector,
-                                                                            int(len(self.imgs)),
-                                                                            len(self.det_angles)))
+                                                                              int(len(self.imgs)),
+                                                                              len(self.det_angles)))
                     self.det_angles = [self.det_ini_angle + i * self.det_angle_step
-                                    for i in range(0, len(self.imgs), 1)]
+                                       for i in range(0, len(self.imgs), 1)]
                 else:
                     if len(self.det_angles) == 0:
                         self.det_angles = [self.det_ini_angle + i * self.det_angle_step
-                                        for i in range(0, int(len(self.imgs) // 3), 1)]
+                                           for i in range(0, int(len(self.imgs) // 3), 1)]
                     if 3 * len(self.det_angles) != len(self.imgs):
                         raise Exception('The number of angle for the %s is not good. '
                                         'There is %s images but %s angles' % (self.detector,
-                                                                            int(len(self.imgs) // 3),
-                                                                            len(self.det_angles)))
+                                                                              int(len(self.imgs) // 3),
+                                                                              len(self.det_angles)))
                     angles = []
                     for angle in self.det_angles:
                         angles = angles + [angle - np.deg2rad(7.47), angle, angle + np.deg2rad(7.47)]
@@ -297,12 +315,15 @@ class xray_geometry():
         # On every subsequent call with the same number of images and same geometry,
         # those ranges are passed back in and the scout pass is skipped entirely.
         result = stitch.stitching(self.imgs,
-                                self.ai,
-                                self.masks,
-                                self.geometry,
-                                flag_scale=flag_scale,
-                                interp_factor=interp_factor,
-                                _cached_qranges=getattr(self, '_qranges_cache', None))
+                                  self.ai,
+                                  self.masks,
+                                  self.geometry,
+                                  flag_scale=flag_scale,
+                                  interp_factor=interp_factor,
+                                  _cached_qranges=getattr(self, '_qranges_cache', None),
+                                  incident_angle=incident_angle,
+                                  tilt_angle=tilt_angle,
+                                  sample_orientation=sample_orientation)
 
         self.img_st, self.mask_st, self.qp, self.qz, self.scales, qranges = result
 
@@ -320,10 +341,10 @@ class xray_geometry():
 
     def inpainting(self, **kwargs):
         self.inpaints, self.mask_inpaints = integrate1D.inpaint_saxs(self.imgs,
-                                                                     self.ai,
-                                                                     self.masks,
-                                                                     **kwargs
-                                                                     )
+                                                                      self.ai,
+                                                                      self.masks,
+                                                                      **kwargs
+                                                                      )
 
 
     def caking(self, radial_range=None, azimuth_range=None, npt_rad=500, npt_azim=500):
@@ -334,7 +355,7 @@ class xray_geometry():
             radial_range = (0.01, np.sqrt(self.qp[1] ** 2 + self.qz[1] ** 2))
         if azimuth_range is None and 'Pilatus' in self.detector:
             azimuth_range = (-180, 180)
-        
+
         if radial_range is None and 'Eiger2_1M' in self.detector:
             radial_range = (0.01, np.sqrt(self.qp[1] ** 2 + self.qz[1] ** 2))
         if azimuth_range is None and 'Eiger2_1M' in self.detector:
@@ -344,24 +365,21 @@ class xray_geometry():
             if np.array_equal(self.inpaints, []):
                 self.inpainting()
             self.cake, self.q_cake, self.chi_cake = integrate1D.cake_saxs(self.inpaints,
-                                                                          self.ai,
-                                                                          self.mask_inpaints,
-                                                                          radial_range=radial_range,
-                                                                          azimuth_range=azimuth_range,
-                                                                          npt_rad=npt_rad,
-                                                                          npt_azim=npt_azim
-                                                                          )
+                                                                           self.ai,
+                                                                           self.mask_inpaints,
+                                                                           radial_range=radial_range,
+                                                                           azimuth_range=azimuth_range,
+                                                                           npt_rad=npt_rad,
+                                                                           npt_azim=npt_azim
+                                                                           )
         elif self.geometry == 'Reflection':
-            #ToDo implement a way to modify the dimension of the cake if required (it need to match the image dim ratio)
-            # if self.inpaints == []:
-            #     self.inpainting()
             self.cake, self.q_cake, self.chi_cake = integrate1D.cake_gisaxs(self.img_st,
-                                                                            self.qp,
-                                                                            self.qz,
-                                                                            bins=None,
-                                                                            radial_range=radial_range,
-                                                                            azimuth_range=azimuth_range
-                                                                            )
+                                                                             self.qp,
+                                                                             self.qz,
+                                                                             bins=None,
+                                                                             radial_range=radial_range,
+                                                                             azimuth_range=azimuth_range
+                                                                             )
 
 
     def radial_averaging(self, radial_range=None, azimuth_range=None, npt=2000):
@@ -381,12 +399,12 @@ class xray_geometry():
                 azimuth_range = (-180, 180)
 
             self.q_rad, self.I_rad = integrate1D.integrate_rad_saxs(self.inpaints,
-                                                                    self.ai,
-                                                                    self.masks,
-                                                                    radial_range=radial_range,
-                                                                    azimuth_range=azimuth_range,
-                                                                    npt=npt
-                                                                    )
+                                                                     self.ai,
+                                                                     self.masks,
+                                                                     radial_range=radial_range,
+                                                                     azimuth_range=azimuth_range,
+                                                                     npt=npt
+                                                                     )
 
         elif self.geometry == 'Reflection':
             if np.array_equal(self.img_st, []):
@@ -395,7 +413,7 @@ class xray_geometry():
                 radial_range = (0, self.qp[1])
             if azimuth_range is None and 'Pilatus' in self.detector:
                 azimuth_range = (0, self.qz[1])
-            
+
             if radial_range is None and 'Eiger2_1M' in self.detector:
                 radial_range = (0, self.qp[1])
             if azimuth_range is None and 'Eiger2_1M' in self.detector:
@@ -407,11 +425,11 @@ class xray_geometry():
                 azimuth_range = (0, self.qz[1])
 
             self.q_rad, self.I_rad = integrate1D.integrate_rad_gisaxs(self.img_st,
-                                                                      self.qp,
-                                                                      self.qz,
-                                                                      bins=npt,
-                                                                      radial_range=radial_range,
-                                                                      azimuth_range=azimuth_range)
+                                                                       self.qp,
+                                                                       self.qz,
+                                                                       bins=npt,
+                                                                       radial_range=radial_range,
+                                                                       azimuth_range=azimuth_range)
 
         else:
             raise Exception('Unknown geometry: should be either Transmission or Reflection')
@@ -437,11 +455,11 @@ class xray_geometry():
                         )
 
         self.chi_azi, self.I_azi = integrate1D.integrate_azi_saxs(self.cake,
-                                                                  self.q_cake,
-                                                                  self.chi_cake,
-                                                                  radial_range=radial_range,
-                                                                  azimuth_range=azimuth_range
-                                                                  )
+                                                                   self.q_cake,
+                                                                   self.chi_cake,
+                                                                   radial_range=radial_range,
+                                                                   azimuth_range=azimuth_range
+                                                                   )
 
 
     def horizontal_integration(self, q_per_range=None, q_par_range=None):
@@ -449,11 +467,11 @@ class xray_geometry():
             self.stitching_data()
 
         self.q_hor, self.I_hor = integrate1D.integrate_qpar(self.img_st,
-                                                            self.qp,
-                                                            self.qz,
-                                                            q_par_range=q_par_range,
-                                                            q_per_range=q_per_range
-                                                            )
+                                                             self.qp,
+                                                             self.qz,
+                                                             q_par_range=q_par_range,
+                                                             q_per_range=q_per_range
+                                                             )
 
 
     def vertical_integration(self, q_per_range=None, q_par_range=None):
@@ -461,19 +479,18 @@ class xray_geometry():
             self.stitching_data()
 
         self.q_ver, self.I_ver = integrate1D.integrate_qper(self.img_st,
-                                                            self.qp,
-                                                            self.qz,
-                                                            q_par_range=q_par_range,
-                                                            q_per_range=q_per_range
-                                                            )
-
+                                                             self.qp,
+                                                             self.qz,
+                                                             q_par_range=q_par_range,
+                                                             q_per_range=q_per_range
+                                                             )
 
 
 def convert_user_azimuth_range(range_deg):
     """
     Convert a range of azimuthal angles from a user-defined system (0° to 360°)
     to the azimuthal range defined by pyFAI ([-π, π)).
-    
+
     User mapping:
         0°  →  0
         90° → -π/2
@@ -483,24 +500,22 @@ def convert_user_azimuth_range(range_deg):
     """
     min_angle, max_angle = range_deg
 
-
     def convert_angle(angle_deg):
         # Normalize the angle to be in the range [0, 360)
         angle_deg = angle_deg % 360
-        
+
         if 0 < angle_deg <= 180:
             return - angle_deg
-        
-        elif  angle_deg == 0:
+
+        elif angle_deg == 0:
             return -180
-            
+
         elif angle_deg > 180:
             return 360 - angle_deg
-            
 
     converted_min = convert_angle(min_angle)
     converted_max = convert_angle(max_angle)
-    
+
     # Logic for full rotation case
     if converted_max == converted_min:
         return [-180, 180]
@@ -511,3 +526,4 @@ def convert_user_azimuth_range(range_deg):
     else:
         return (converted_min, converted_max)
 
+# %%
