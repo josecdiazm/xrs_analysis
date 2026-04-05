@@ -107,7 +107,7 @@ def remesh_gi(data, ai, npt=None, q_h_range=None, q_v_range=None, method='splitb
     )
 
     intensity, q_ip, q_oop = result
-    return intensity, q_ip, q_oop
+    return np.flipud(intensity), q_ip, q_oop
 
 
 def remesh_transmission(image, ai, bins=None, q_h_range=None, q_v_range=None, mask=None):
