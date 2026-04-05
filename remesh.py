@@ -6,7 +6,7 @@ import numpy as np
 from pyFAI.ext import splitBBox
 
 
-def remesh_gi(data, ai, npt=None, q_h_range=None, q_v_range=None, method='splitbbox', mask=None,
+def remesh_gi(data, ai, npt=None, q_h_range=None, q_v_range=None, method='bbox', mask=None,
               incident_angle=0.0, tilt_angle=0.0, sample_orientation=4):
     """
     Redraw the Grazing-Incidence image in (qp, qz) coordinates using pyGIX
