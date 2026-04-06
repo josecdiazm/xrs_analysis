@@ -46,10 +46,10 @@ def stitching(datas, ais, masks, geometry='Reflection', interp_factor=2,
         for i, (data, ai, mask) in enumerate(zip(datas, ais, masks)):
             
             if geometry == 'Reflection':
-                img, x, y = remesh.remesh_gi(data, ai, method='splitbbox', mask=mask,
+                img, x, y = remesh.remesh_gi(data, ai, mask=mask,
                                              incident_angle=incident_angle,
                                              tilt_angle=tilt_angle,
-                                             sample_orientation=sample_orientation)
+                                             sample_orientation=sample_orientation)    # method='splitbbox',
                 if i == 0:
                     q_p_ini = np.zeros((np.shape(x)[0], len(datas)))
                     q_z_ini = np.zeros((np.shape(y)[0], len(datas)))
@@ -95,10 +95,10 @@ def stitching(datas, ais, masks, geometry='Reflection', interp_factor=2,
                 op_range = (qz_remesh[0], qz_remesh[-1])
                 msk, _, _ = remesh.remesh_gi(mask.astype(int), ai, npt=npt,
                                              q_h_range=ip_range, q_v_range=op_range,
-                                             method='splitbbox', mask=mask,
+                                             mask=mask,
                                              incident_angle=incident_angle,
                                              tilt_angle=tilt_angle,
-                                             sample_orientation=sample_orientation)
+                                             sample_orientation=sample_orientation)    #method='splitbbox', 
 
                 cached_qmasks.append(np.rot90(msk, 2))
                 
@@ -143,10 +143,10 @@ def stitching(datas, ais, masks, geometry='Reflection', interp_factor=2,
             op_range = (qz_remesh[0], qz_remesh[-1])
             img, x, y = remesh.remesh_gi(data, ai, npt=npt,
                                          q_h_range=ip_range, q_v_range=op_range,
-                                         method='splitbbox', mask=mask,
+                                          mask=mask,
                                          incident_angle=incident_angle,
                                          tilt_angle=tilt_angle,
-                                         sample_orientation=sample_orientation)
+                                         sample_orientation=sample_orientation)         # method='splitbbox',
             qimage = np.rot90(img, 2)
             # qp, qz = -x[::-1], y[::-1]
 
