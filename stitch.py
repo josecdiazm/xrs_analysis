@@ -229,7 +229,7 @@ def stitching(datas, ais, masks, geometry='Reflection', interp_factor=2,
         img = np.flipud(img)
 
     qp_out = [qp_remesh.min(), qp_remesh.max()]
-    qz_out = [-qz_remesh.max(), -qz_remesh.min()]
+    qz_out = [qz_remesh.max(), qz_remesh.min()] # was [-qz_remesh.max(), -qz_remesh.min()]
 
     if resc_q:
         qp_out[:] = [v * 10 for v in qp_out]
