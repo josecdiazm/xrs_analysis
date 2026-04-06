@@ -27,7 +27,7 @@ def _get_fiber_integrator(ai):
 
 
 def remesh_gi(data, ai, npt=None, q_h_range=None, q_v_range=None, method='splitbbox', mask=None,
-              incident_angle=0.0, tilt_angle=0.0, sample_orientation=6):
+              incident_angle=0.0, tilt_angle=0.0, sample_orientation=1):
     """
     Redraw the Grazing-Incidence image in (qp, qz) coordinates using pyGIX
     FiberIntegrator with persistent LUT caching.
@@ -74,7 +74,7 @@ def remesh_gi(data, ai, npt=None, q_h_range=None, q_v_range=None, method='splitb
         unit_oop="qoop_A^-1",
         ip_range=q_h_range,
         oop_range=q_v_range,
-        method='splitpix',
+        # method='splitpix',
         mask=mask
     )
 
