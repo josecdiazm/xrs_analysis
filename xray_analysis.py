@@ -243,7 +243,7 @@ class xray_geometry():
 
 
     def stitching_data(self, flag_scale=True, interp_factor=1,
-                       incident_angle=None, tilt_angle=0.0, sample_orientation=7):
+                       incident_angle=None, tilt_angle=0.0, sample_orientation=8):
         """
         Remesh and stitch the loaded images into a single q-space map.
 
