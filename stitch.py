@@ -9,7 +9,7 @@ import remesh
 
 def stitching(datas, ais, masks, geometry='Reflection', interp_factor=2,
               flag_scale=True, resc_q=False, _cached_qranges=None,
-              incident_angle=0.0, tilt_angle=0.0, sample_orientation=4):
+              incident_angle=0.0, tilt_angle=0.0, sample_orientation=1):
     '''
     Remeshing in q-space the 2D image collected by the pixel detector and stitching together
     images at different detector position (if several images).
@@ -44,6 +44,7 @@ def stitching(datas, ais, masks, geometry='Reflection', interp_factor=2,
         # the result is identical every time, so we cache and skip it after.
         # -----------------------------------------------------------------------
         for i, (data, ai, mask) in enumerate(zip(datas, ais, masks)):
+            
             if geometry == 'Reflection':
                 img, x, y = remesh.remesh_gi(data, ai, method='splitbbox', mask=mask,
                                              incident_angle=incident_angle,
@@ -82,7 +83,9 @@ def stitching(datas, ais, masks, geometry='Reflection', interp_factor=2,
         # image data, so it is identical for every file in a batch run.
         # -------------------------------------------------------------------
         cached_qmasks = []
+
         for i, (ai, mask) in enumerate(zip(ais, masks)):
+            
             qp_start = np.argmin(abs(qp_remesh - np.min(q_p_ini[:, i])))
             qp_stop  = np.argmin(abs(qp_remesh - np.max(q_p_ini[:, i])))
             npt = (int(qp_stop - qp_start), int(np.shape(qz_remesh)[0]))
@@ -145,7 +148,7 @@ def stitching(datas, ais, masks, geometry='Reflection', interp_factor=2,
                                          tilt_angle=tilt_angle,
                                          sample_orientation=sample_orientation)
             qimage = np.rot90(img, 2)
-            qp, qz = -x[::-1], y[::-1]
+            # qp, qz = -x[::-1], y[::-1]
 
         elif geometry == 'Transmission':
             ip_range = (qp_remesh[qp_start], qp_remesh[qp_stop])
@@ -229,7 +232,7 @@ def stitching(datas, ais, masks, geometry='Reflection', interp_factor=2,
         img = np.flipud(img)
 
     qp_out = [qp_remesh.min(), qp_remesh.max()]
-    qz_out = [qz_remesh.max(), qz_remesh.min()] # was [-qz_remesh.max(), -qz_remesh.min()]
+    qz_out = [-qz_remesh.max(), -qz_remesh.min()]
 
     if resc_q:
         qp_out[:] = [v * 10 for v in qp_out]
