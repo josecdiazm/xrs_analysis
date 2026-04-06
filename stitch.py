@@ -225,8 +225,8 @@ def stitching(datas, ais, masks, geometry='Reflection', interp_factor=2,
     img = img_te / sca2
     mask_out = (img_mask.astype(bool)).astype(int)
 
-    # if geometry == 'Reflection':
-    #     img = np.flipud(img)
+    if geometry == 'Reflection':
+        img = np.flipud(img)
 
     qp_out = [qp_remesh.min(), qp_remesh.max()]
     qz_out = [-qz_remesh.max(), -qz_remesh.min()]
