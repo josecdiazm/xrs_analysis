@@ -145,7 +145,7 @@ def stitching(datas, ais, masks, geometry='Reflection', interp_factor=2,
                                          tilt_angle=tilt_angle,
                                          sample_orientation=sample_orientation)
             qimage = np.rot90(img, 2)
-            qp, qz = x,y  -x[::-1], y[::-1]
+            qp, qz = -x[::-1], y[::-1]
 
         elif geometry == 'Transmission':
             ip_range = (qp_remesh[qp_start], qp_remesh[qp_stop])
