@@ -52,8 +52,8 @@ def stitching(datas, ais, masks, geometry='Reflection', interp_factor=2,
                 if i == 0:
                     q_p_ini = np.zeros((np.shape(x)[0], len(datas)))
                     q_z_ini = np.zeros((np.shape(y)[0], len(datas)))
-                q_p_ini[:len(x), i] = x  # used to be -x[::-1]
-                q_z_ini[:len(y), i] = y  # used to be y[::-1]
+                q_p_ini[:len(x), i] = -x[::-1]
+                q_z_ini[:len(y), i] = y[::-1]
 
             elif geometry == 'Transmission':
                 img, x, y, resc_q = remesh.remesh_transmission(data, ai, mask=mask)
@@ -97,8 +97,8 @@ def stitching(datas, ais, masks, geometry='Reflection', interp_factor=2,
                                              tilt_angle=tilt_angle,
                                              sample_orientation=sample_orientation)
 
-                cached_qmasks.append(msk)
-                # cached_qmasks.append(np.rot90(msk, 2))
+                cached_qmasks.append(np.rot90(msk, 2))
+                
 
             elif geometry == 'Transmission':
                 ip_range = (qp_remesh[qp_start], qp_remesh[qp_stop])
@@ -144,8 +144,8 @@ def stitching(datas, ais, masks, geometry='Reflection', interp_factor=2,
                                          incident_angle=incident_angle,
                                          tilt_angle=tilt_angle,
                                          sample_orientation=sample_orientation)
-            qimage = img  #used to be np.rot90(img, 2)
-            qp, qz = x,y  # used to be -x[::-1], y[::-1]
+            qimage = np.rot90(img, 2)
+            qp, qz = x,y  -x[::-1], y[::-1]
 
         elif geometry == 'Transmission':
             ip_range = (qp_remesh[qp_start], qp_remesh[qp_stop])

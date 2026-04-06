@@ -84,7 +84,7 @@ def remesh_gi(data, ai, npt=None, q_h_range=None, q_v_range=None, method='splitb
     # sample_orientation=4 returns the image with the same axis convention as
     # transform_reciprocal did — no additional flip needed here.
     # stitch.py applies its own np.rot90 and np.flipud downstream.
-    return intensity, q_ip, q_oop
+    return np.flipud(intensity), q_ip, q_oop
 
 
 def remesh_transmission(image, ai, bins=None, q_h_range=None, q_v_range=None, mask=None):
