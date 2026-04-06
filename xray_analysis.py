@@ -243,7 +243,7 @@ class xray_geometry():
 
 
     def stitching_data(self, flag_scale=True, interp_factor=1,
-                       incident_angle=None, tilt_angle=0.0, sample_orientation=1):
+                       incident_angle=None, tilt_angle=0.0, sample_orientation=2):
         """
         Remesh and stitch the loaded images into a single q-space map.
 
@@ -254,7 +254,7 @@ class xray_geometry():
         :param incident_angle: grazing incident angle in radians (Reflection geometry only).
                                Defaults to self.alphai stored from __init__ if not provided.
         :param tilt_angle: tilt angle in radians (Reflection geometry only)
-        :param sample_orientation: pyGIX sample orientation integer 1-8 (Reflection geometry only)
+        :param sample_orientation: pyGIX sample orientation integer 1-4 (Reflection geometry only)
         """
         self.img_st, self.qp, self.qz = [], [], []
 
