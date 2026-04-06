@@ -4,6 +4,7 @@
 # %%
 import numpy as np
 from pyFAI.ext import splitBBox
+from pyFAI.integrator.fiber import FiberIntegrator
 
 # ---------------------------------------------------------------------------
 # Module-level LUT cache for FiberIntegrator objects.
@@ -27,7 +28,7 @@ def _get_fiber_integrator(ai):
 
 
 def remesh_gi(data, ai, npt=None, q_h_range=None, q_v_range=None, method='splitbbox', mask=None,
-              incident_angle=0.0, tilt_angle=0.0, sample_orientation=2):
+              incident_angle=0.0, tilt_angle=0.0, sample_orientation=5):
     """
     Redraw the Grazing-Incidence image in (qp, qz) coordinates using pyGIX
     FiberIntegrator with persistent LUT caching.
