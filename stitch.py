@@ -96,7 +96,9 @@ def stitching(datas, ais, masks, geometry='Reflection', interp_factor=2,
                                              incident_angle=incident_angle,
                                              tilt_angle=tilt_angle,
                                              sample_orientation=sample_orientation)
-                cached_qmasks.append(np.rot90(msk, 2))
+
+                cached_qmasks.append(msk))
+                # cached_qmasks.append(np.rot90(msk, 2))
 
             elif geometry == 'Transmission':
                 ip_range = (qp_remesh[qp_start], qp_remesh[qp_stop])
