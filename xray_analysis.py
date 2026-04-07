@@ -2,6 +2,7 @@
 
 
 # %%
+
 import enum
 from pyFAI import azimuthalIntegrator
 from pygix import Transform
@@ -85,7 +86,8 @@ class xray_geometry():
         elif self.detector == 'Eiger2_1M':
             self.det = Detector.Eiger2_1M()
         else:
-            raise Exception('Unknown detector. Should be either: Pilatus2m or Pilatus1m or Pilatus300kw or Pilatus900kw or rayonix or Eiger2_1M')
+            raise Exception('Unknown detector. Should be either: Pilatus2m or Pilatus1m or '
+                            'Pilatus300kw or Pilatus900kw or rayonix or Eiger2_1M')
 
 
     def open_data(self, path, lst_img, optional_mask=None):
@@ -116,7 +118,7 @@ class xray_geometry():
         self.q_rad, self.I_rad = [], []
 
         if len(lst_img) != len(self.bs):
-            self.bs = self.bs + [[0, 0]]*(len(lst_img) - len(self.bs))
+            self.bs = self.bs + [[0, 0]] * (len(lst_img) - len(self.bs))
 
         for i, (img, bs) in enumerate(zip(lst_img, self.bs)):
             if self.detector != 'rayonix':
@@ -126,7 +128,8 @@ class xray_geometry():
                     self.masks.append(masks[:, 212:212 + 195])
                     self.masks.append(masks[:, -195:])
                 else:
-                    self.masks.append(self.det.calc_mask(bs=bs, bs_kind=self.bs_kind, optional_mask=optional_mask))
+                    self.masks.append(self.det.calc_mask(bs=bs, bs_kind=self.bs_kind,
+                                                         optional_mask=optional_mask))
 
             if self.detector == 'Pilatus1m' or self.detector == 'Pilatus2m':
                 self.imgs.append(fabio.open(os.path.join(path, img)).data)
@@ -162,7 +165,7 @@ class xray_geometry():
         if not lst_img:
             raise Exception('You are trying to load an empty dataset')
         if len(lst_img) != len(self.bs):
-            self.bs = self.bs + [[0, 0]]*(len(lst_img) - len(self.bs))
+            self.bs = self.bs + [[0, 0]] * (len(lst_img) - len(self.bs))
 
         self.imgs = []
         for img, bs in zip(lst_img, self.bs):
@@ -173,7 +176,8 @@ class xray_geometry():
                     self.masks.append(masks[:, 212:212 + 195])
                     self.masks.append(masks[:, -195:])
                 else:
-                    self.masks.append(self.det.calc_mask(bs=bs, bs_kind=self.bs_kind, optional_mask=optional_mask))
+                    self.masks.append(self.det.calc_mask(bs=bs, bs_kind=self.bs_kind,
+                                                         optional_mask=optional_mask))
 
             if self.detector == 'Pilatus1m' or self.detector == 'Pilatus2m':
                 self.imgs.append(img)
@@ -214,39 +218,15 @@ class xray_geometry():
 
 
     def calculate_integrator_gi(self, det_rots):
-        # ai = Transform(wavelength=self.wav, detector=self.det, incident_angle=self.alphai)
-        # ai.setFit2D(directDist=self.sdd, centerX=self.center[0], centerY=self.center[1])
-        # ai.set_incident_angle(self.alphai)
+        ai = Transform(wavelength=self.wav, detector=self.det, incident_angle=self.alphai)
+        ai.setFit2D(directDist=self.sdd, centerX=self.center[0], centerY=self.center[1])
+        ai.set_incident_angle(self.alphai)
 
-        # for i, det_rot in enumerate(det_rots):
-        #     ai_temp = copy.deepcopy(ai)
-        #     ai_temp.rot1 = det_rot
-        #     ai_temp.set_incident_angle(self.alphai)
-        #     self.ai.append(ai_temp)
-        
-        from pyFAI import azimuthalIntegrator
-        import copy
-
-        self.ai = []
-
-        # Build a base AzimuthalIntegrator exactly as in calculate_integrator_trans
-        base_ai = azimuthalIntegrator.AzimuthalIntegrator(
-            detector=self.det,
-            rot1=0,
-            rot2=0,
-            rot3=0,
-        )
-        base_ai.setFit2D(self.sdd, self.center[0], self.center[1])
-        base_ai.set_wavelength(self.wav)
-
-        # Promote once to FiberIntegrator, then deep-copy per angle
-        base_fi = base_ai.promote(type_="pyFAI.integrator.fiber.FiberIntegrator")
-
-        for det_rot in det_rots:
-            fi_temp = copy.deepcopy(base_fi)
-            fi_temp.rot1 = det_rot
-            self.ai.append(fi_temp)
-
+        for i, det_rot in enumerate(det_rots):
+            ai_temp = copy.deepcopy(ai)
+            ai_temp.rot1 = det_rot
+            ai_temp.set_incident_angle(self.alphai)
+            self.ai.append(ai_temp)
 
 
     def calculate_integrator_gi2(self, det_rots):
@@ -267,7 +247,7 @@ class xray_geometry():
 
 
     def stitching_data(self, flag_scale=True, interp_factor=1,
-                       incident_angle=None, tilt_angle=0.0, sample_orientation=7):
+                       incident_angle=None, tilt_angle=0.0, sample_orientation=1):
         """
         Remesh and stitch the loaded images into a single q-space map.
 
@@ -306,8 +286,8 @@ class xray_geometry():
                     if len(self.det_angles) != 0 and len(self.det_angles) > len(self.imgs):
                         raise Exception('The number of angle for the %s is not good. '
                                         'There is %s images but %s angles' % (self.detector,
-                                                                              int(len(self.imgs)),
-                                                                              len(self.det_angles)))
+                                                                               int(len(self.imgs)),
+                                                                               len(self.det_angles)))
                     self.det_angles = [self.det_ini_angle + i * self.det_angle_step
                                        for i in range(0, len(self.imgs), 1)]
                 else:
@@ -317,8 +297,8 @@ class xray_geometry():
                     if 3 * len(self.det_angles) != len(self.imgs):
                         raise Exception('The number of angle for the %s is not good. '
                                         'There is %s images but %s angles' % (self.detector,
-                                                                              int(len(self.imgs) // 3),
-                                                                              len(self.det_angles)))
+                                                                               int(len(self.imgs) // 3),
+                                                                               len(self.det_angles)))
                     angles = []
                     for angle in self.det_angles:
                         angles = angles + [angle - np.deg2rad(7.47), angle, angle + np.deg2rad(7.47)]
@@ -413,13 +393,15 @@ class xray_geometry():
             if np.array_equal(self.inpaints, []):
                 self.inpainting()
             if radial_range is None and (self.detector == 'Pilatus300kw' or self.detector == 'Pilatus900kw'):
-                radial_range = (0.001, np.sqrt(self.qp[1]**2 + self.qz[1]**2))
+                radial_range = (0.001, np.sqrt(self.qp[1] ** 2 + self.qz[1] ** 2))
             if azimuth_range is None and (self.detector == 'Pilatus300kw' or self.detector == 'Pilatus900kw'):
                 azimuth_range = (0, 90)
 
-            if radial_range is None and (self.detector == 'Pilatus1m' or self.detector == 'Pilatus2m' or self.detector == 'Eiger2_1M'):
-                radial_range = (0.0001, np.sqrt(self.qp[1]**2 + self.qz[1]**2))
-            if azimuth_range is None and (self.detector == 'Pilatus1m' or self.detector == 'Pilatus2m' or self.detector == 'Eiger2_1M'):
+            if radial_range is None and (self.detector == 'Pilatus1m' or self.detector == 'Pilatus2m'
+                                         or self.detector == 'Eiger2_1M'):
+                radial_range = (0.0001, np.sqrt(self.qp[1] ** 2 + self.qz[1] ** 2))
+            if azimuth_range is None and (self.detector == 'Pilatus1m' or self.detector == 'Pilatus2m'
+                                          or self.detector == 'Eiger2_1M'):
                 azimuth_range = (-180, 180)
 
             self.q_rad, self.I_rad = integrate1D.integrate_rad_saxs(self.inpaints,
@@ -466,9 +448,11 @@ class xray_geometry():
         if azimuth_range is None and (self.detector == 'Pilatus300kw' or self.detector == 'Pilatus900kw'):
             azimuth_range = (1, 90)
 
-        if radial_range is None and (self.detector == 'Pilatus1m' or self.detector == 'Pilatus2m' or self.detector == 'Eiger2_1M'):
+        if radial_range is None and (self.detector == 'Pilatus1m' or self.detector == 'Pilatus2m'
+                                     or self.detector == 'Eiger2_1M'):
             radial_range = (0.001, np.sqrt(self.qp[1] ** 2 + self.qz[1] ** 2))
-        if azimuth_range is None and (self.detector == 'Pilatus1m' or self.detector == 'Pilatus2m' or self.detector == 'Eiger2_1M'):
+        if azimuth_range is None and (self.detector == 'Pilatus1m' or self.detector == 'Pilatus2m'
+                                      or self.detector == 'Eiger2_1M'):
             azimuth_range = (-180, 180)
 
         if np.array_equal(self.cake, []):
@@ -516,11 +500,11 @@ def convert_user_azimuth_range(range_deg):
     to the azimuthal range defined by pyFAI ([-π, π)).
 
     User mapping:
-        0°  →  0
-        90° → -π/2
-        180° → -π
-        270° → π/2
-        360° → 0
+        0°   →   0
+        90°  →  -π/2
+        180° →  -π
+        270° →   π/2
+        360° →   0
     """
     min_angle, max_angle = range_deg
 
@@ -529,7 +513,7 @@ def convert_user_azimuth_range(range_deg):
         angle_deg = angle_deg % 360
 
         if 0 < angle_deg <= 180:
-            return - angle_deg
+            return -angle_deg
 
         elif angle_deg == 0:
             return -180
@@ -549,5 +533,6 @@ def convert_user_azimuth_range(range_deg):
 
     else:
         return (converted_min, converted_max)
+
 
 # %%
