@@ -97,7 +97,7 @@ def stitching(datas, ais, masks, geometry='Reflection', interp_factor=2,
         qz_remesh = np.linspace(
             min(q_z_ini[:, 0]), max(q_z_ini[:, -1]),
             int(nb_point * abs(max(q_z_ini[:, -1]) - min(q_z_ini[:, 0])) /
-                abs(max(qp_remesh[-1]) - min(qp_remesh[0])))
+                abs(qp_remesh[-1] - qp_remesh[0]))
         )
 
 
