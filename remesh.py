@@ -74,9 +74,18 @@ def remesh_gi(data, ai, npt=None, q_h_range=None, q_v_range=None, method='splitp
     #   q_z_ini[:, i] = y[::-1]
     # These sign conventions will be verified/adjusted once the correct
     # sample_orientation is confirmed via the diagnostic function below.
-    print(f"  remesh_gi raw output: q_ip=[{q_ip.min():.4f}, {q_ip.max():.4f}]  q_oop=[{q_oop.min():.4f}, {q_oop.max():.4f}]")
-    
-    return intensity, q_ip, q_oop
+    # print(f"  remesh_gi raw output: q_ip=[{q_ip.min():.4f}, {q_ip.max():.4f}]  q_oop=[{q_oop.min():.4f}, {q_oop.max():.4f}]")
+        # Also flip the intensity array axes to match the swap.
+
+    q_par = -q_oop
+    q_ver =  q_ip  
+
+    # intensity shape is (npt_oop, npt_ip) = (rows=oop, cols=ip)
+    # After swapping axes, rows should be q_ver (ip) and cols should be q_par (oop)
+    # So we transpose and flip q_par axis
+    intensity_out = np.fliplr(intensity.T)
+
+    return intensity_out, q_par, q_ver
 
 
 

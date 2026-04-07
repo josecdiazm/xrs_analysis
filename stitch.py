@@ -23,24 +23,49 @@ def stitching(datas, ais, masks, geometry='Reflection', interp_factor=2,
     :param interp_factor: factor to increase the binning of the stitched image
     :param flag_scale: Boolean to scale consecutive images at different detector positions
     :param resc_q: Rescale qs (fix for pyFAI bug when qs exceed pi)
-    :param _cached_qranges: dict from a previous call to skip the scout pass
+    :param _cached_qranges: dict with keys 'qp_remesh', 'qz_remesh', 'q_p_ini', 'q_z_ini',
+                            and 'qmasks' from a previous call with the same geometry/detector
+                            configuration. If provided, the expensive scout remesh pass and
+                            mask remesh are skipped entirely.
     :param incident_angle: grazing incident angle in radians (Reflection geometry only)
+    :type incident_angle: float
     :param tilt_angle: tilt angle in radians (Reflection geometry only)
+    :type tilt_angle: float
     :param sample_orientation: FiberIntegrator sample orientation 1-8 (Reflection geometry only)
+    :type sample_orientation: int
     '''
 
     if _cached_qranges is None:
-
+        # -----------------------------------------------------------------------
+        # SCOUT PASS: run remesh once per image just to find the q-space extent
+        # and the per-image q-ranges needed for stitching overlap calculation.
+        # This only runs on the very first call for a given geometry setup.
+        # For fixed geometry (same detector, SDD, beam center, wavelength, alphai)
+        # the result is identical every time, so we cache and skip it after.
+        #
+        # For Reflection geometry with FiberIntegrator orientation 4, remesh_gi
+        # returns corrected axes after internal axis swapping and negation:
+        #   q_par (in-plane, horizontal) : -q_oop  →  -0.099 to +0.305
+        #   q_ver (out-of-plane, vertical):  q_ip   →  -0.078 to +0.278
+        # These are stored directly into q_p_ini and q_z_ini without further
+        # sign manipulation — the correction is fully encapsulated in remesh_gi.
+        # -----------------------------------------------------------------------
         for i, (data, ai, mask) in enumerate(zip(datas, ais, masks)):
-            # <-- this is the scout loop body, indented one level inside the for
+
             if geometry == 'Reflection':
                 img, x, y = remesh.remesh_gi(data, ai, mask=mask,
                                              incident_angle=incident_angle,
                                              tilt_angle=tilt_angle,
                                              sample_orientation=sample_orientation)
                 if i == 0:
+                    # NaN-initialised so that unfilled padding rows do not
+                    # corrupt nanmin/nanmax calculations when images differ
+                    # in q-extent (e.g. multi-panel stitching configurations).
                     q_p_ini = np.full((np.shape(x)[0], len(datas)), np.nan)
                     q_z_ini = np.full((np.shape(y)[0], len(datas)), np.nan)
+
+                # x = q_par (in-plane, corrected in remesh_gi)
+                # y = q_ver (out-of-plane, corrected in remesh_gi)
                 q_p_ini[:len(x), i] = x
                 q_z_ini[:len(y), i] = y
 
@@ -49,14 +74,9 @@ def stitching(datas, ais, masks, geometry='Reflection', interp_factor=2,
                 if i == 0:
                     q_p_ini = np.full((np.shape(x)[0], len(datas)), np.nan)
                     q_z_ini = np.full((np.shape(y)[0], len(datas)), np.nan)
+
                 q_p_ini[:len(x), i] = x
                 q_z_ini[:len(y), i] = y
-
-        # <-- THIS IS OUTSIDE THE FOR LOOP (same indent level as the for statement)
-        print("=== RAW SCOUT RESULTS ===")
-        for j in range(q_p_ini.shape[1]):
-            print(f"  Image {j}: q_p_ini min={np.nanmin(q_p_ini[:,j]):.4f}  max={np.nanmax(q_p_ini[:,j]):.4f}")
-            print(f"  Image {j}: q_z_ini min={np.nanmin(q_z_ini[:,j]):.4f}  max={np.nanmax(q_z_ini[:,j]):.4f}")
 
         nb_point = len(q_p_ini[:, 0])
         for i in range(1, np.shape(q_p_ini)[1], 1):
@@ -65,6 +85,9 @@ def stitching(datas, ais, masks, geometry='Reflection', interp_factor=2,
 
         nb_point = nb_point * interp_factor
 
+        # Build the target q-grids using nanmin/nanmax so that NaN padding
+        # entries (from shorter images in multi-panel configurations) are
+        # correctly ignored when computing the global q extent.
         qp_remesh = np.linspace(np.nanmin(q_p_ini), np.nanmax(q_p_ini), nb_point)
         qz_remesh = np.linspace(
             np.nanmin(q_z_ini), np.nanmax(q_z_ini),
@@ -72,12 +95,10 @@ def stitching(datas, ais, masks, geometry='Reflection', interp_factor=2,
                 abs(np.nanmax(q_p_ini) - np.nanmin(q_p_ini)))
         )
 
-        print(f"\n=== REMESH GRIDS ===")
-        print(f"  qp_remesh: min={qp_remesh.min():.4f}  max={qp_remesh.max():.4f}  npts={len(qp_remesh)}")
-        print(f"  qz_remesh: min={qz_remesh.min():.4f}  max={qz_remesh.max():.4f}  npts={len(qz_remesh)}")
-
         # -------------------------------------------------------------------
-        # Remesh the masks once and cache them.
+        # Remesh the masks once here during the scout pass and cache them.
+        # The mask only depends on geometry and beamstop position, not on the
+        # image data, so it is identical for every file in a batch run.
         # -------------------------------------------------------------------
         cached_qmasks = []
 
@@ -88,6 +109,8 @@ def stitching(datas, ais, masks, geometry='Reflection', interp_factor=2,
             npt      = (int(qp_stop - qp_start), int(np.shape(qz_remesh)[0]))
 
             if geometry == 'Reflection':
+                # ip_range and op_range use the corrected signed q values
+                # returned by remesh_gi — no additional sign manipulation needed.
                 ip_range = (qp_remesh[qp_start], qp_remesh[qp_stop])
                 op_range = (qz_remesh[0], qz_remesh[-1])
                 msk, _, _ = remesh.remesh_gi(mask.astype(int), ai, npt=npt,
@@ -108,7 +131,11 @@ def stitching(datas, ais, masks, geometry='Reflection', interp_factor=2,
 
     else:
         # -----------------------------------------------------------------------
-        # CACHED PATH
+        # CACHED PATH: geometry hasn't changed, reuse everything from last time.
+        # This saves the entire scout remesh pass and mask remesh pass.
+        # q_p_ini and q_z_ini are also cached because they are needed to compute
+        # the per-image qp_start/qp_stop overlap positions during stitching,
+        # and those positions depend only on the detector angles, not the data.
         # -----------------------------------------------------------------------
         qp_remesh     = _cached_qranges['qp_remesh']
         qz_remesh     = _cached_qranges['qz_remesh']
@@ -117,7 +144,8 @@ def stitching(datas, ais, masks, geometry='Reflection', interp_factor=2,
         cached_qmasks = _cached_qranges['qmasks']
 
     # ---------------------------------------------------------------------------
-    # MAIN PASS
+    # MAIN PASS: remesh each image onto the target q-grid and stitch.
+    # The mask remesh is skipped here entirely — we use the cached version.
     # ---------------------------------------------------------------------------
     for i, (data, ai, mask) in enumerate(zip(datas, ais, masks)):
 
@@ -127,6 +155,10 @@ def stitching(datas, ais, masks, geometry='Reflection', interp_factor=2,
         qmask    = cached_qmasks[i]
 
         if geometry == 'Reflection':
+            # Pass the corrected signed q ranges directly into remesh_gi.
+            # The axis swap and negation are handled inside remesh_gi so the
+            # ip_range and op_range here correspond to q_par and q_ver as
+            # returned by remesh_gi, not the raw FiberIntegrator q_ip/q_oop.
             ip_range = (qp_remesh[qp_start], qp_remesh[qp_stop])
             op_range = (qz_remesh[0], qz_remesh[-1])
             img, x, y = remesh.remesh_gi(data, ai, npt=npt,
@@ -135,6 +167,9 @@ def stitching(datas, ais, masks, geometry='Reflection', interp_factor=2,
                                          incident_angle=incident_angle,
                                          tilt_angle=tilt_angle,
                                          sample_orientation=sample_orientation)
+            # remesh_gi returns the intensity already transposed and flipped
+            # to match the corrected q_par/q_ver axis convention.
+            # No further rotation or flipping needed here.
             qimage = img
 
         elif geometry == 'Transmission':
@@ -151,6 +186,8 @@ def stitching(datas, ais, masks, geometry='Reflection', interp_factor=2,
             sca1 = np.zeros(np.shape(img_te))
             sca2 = np.zeros(np.shape(img_te))
             sca3 = np.zeros(np.shape(img_te))
+            # Place the first image into the correct position in the global grid.
+            # qp_start marks the column index where this image's q_par range begins.
             img_te[:, qp_start:qp_start + np.shape(qimage)[1]]   = qimage
             img_mask[:, qp_start:qp_start + np.shape(qmask)[1]] += np.logical_not(qmask).astype(int)
             sca[np.nonzero(img_te)]  += 1
@@ -218,6 +255,9 @@ def stitching(datas, ais, masks, geometry='Reflection', interp_factor=2,
     img      = img_te / sca2
     mask_out = (img_mask.astype(bool)).astype(int)
 
+    # No flipud needed — remesh_gi already returns the intensity correctly
+    # oriented with q_ver (out-of-plane) increasing upward.
+    # q ranges are signed correctly from the corrected remesh_gi output.
     qp_out = [qp_remesh.min(), qp_remesh.max()]
     qz_out = [qz_remesh.min(), qz_remesh.max()]
 
