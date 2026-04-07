@@ -35,6 +35,22 @@ def stitching(datas, ais, masks, geometry='Reflection', interp_factor=2,
         # -----------------------------------------------------------------------
         for i, (data, ai, mask) in enumerate(zip(datas, ais, masks)):
 
+
+            # Add these right after the scout for loop, before nb_point calculation
+            print("=== RAW SCOUT RESULTS ===")
+            for i in range(q_p_ini.shape[1]):
+                print(f"  Image {i}: q_p_ini min={np.nanmin(q_p_ini[:,i]):.4f}  max={np.nanmax(q_p_ini[:,i]):.4f}")
+                print(f"  Image {i}: q_z_ini min={np.nanmin(q_z_ini[:,i]):.4f}  max={np.nanmax(q_z_ini[:,i]):.4f}")
+            
+            print(f"\n=== AFTER nb_point ===")
+            print(f"  nb_point (before interp_factor): {nb_point // interp_factor}")
+            print(f"  nb_point (after  interp_factor): {nb_point}")
+            
+            # Add these right after qz_remesh is computed
+            print(f"\n=== REMESH GRIDS ===")
+            print(f"  qp_remesh: min={qp_remesh.min():.4f}  max={qp_remesh.max():.4f}  npts={len(qp_remesh)}")
+            print(f"  qz_remesh: min={qz_remesh.min():.4f}  max={qz_remesh.max():.4f}  npts={len(qz_remesh)}")
+
             if geometry == 'Reflection':
                 img, x, y = remesh.remesh_gi(data, ai, mask=mask,
                                              incident_angle=incident_angle,

@@ -74,7 +74,8 @@ def remesh_gi(data, ai, npt=None, q_h_range=None, q_v_range=None, method='splitp
     #   q_z_ini[:, i] = y[::-1]
     # These sign conventions will be verified/adjusted once the correct
     # sample_orientation is confirmed via the diagnostic function below.
-
+    print(f"  remesh_gi raw output: q_ip=[{q_ip.min():.4f}, {q_ip.max():.4f}]  q_oop=[{q_oop.min():.4f}, {q_oop.max():.4f}]")
+    
     return intensity, q_ip, q_oop
 
 
