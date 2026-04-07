@@ -7,47 +7,73 @@ from pyFAI.ext import splitBBox
 
 
 def remesh_gi(data, ai, npt=None, q_h_range=None, q_v_range=None, method='splitpix',
-              mask=None, incident_angle=0.0, tilt_angle=0.0, sample_orientation=4):
+              mask=None, incident_angle=0.0, tilt_angle=0.0, sample_orientation=7):
     """
-    Redraw the Grazing-Incidence image in (qip, qoop) coordinates using
-    pyFAI FiberIntegrator instead of pyGIX Transform.
+    Redraw the Grazing-Incidence image in (q_par, q_ver) coordinates using
+    pyFAI FiberIntegrator.integrate2d_grazing_incidence().
+
+    For sample_orientation=7 the FiberIntegrator returns:
+        raw q_ip  : -0.305 → +0.099  (physically -q_ver, out-of-plane but negated)
+        raw q_oop : -0.077 → +0.278  (physically  q_par, in-plane, correct sign)
+        intensity : shape (npt_ip, npt_oop) = (q_z rows, q_par cols)
+
+    Corrections applied before returning:
+        q_par =  q_oop          (in-plane,     keep as-is)
+        q_ver = -q_ip           (out-of-plane, negate to get -0.099 → +0.305)
+        intensity = flipud       (vertical flip to match negated q_ver axis)
+
+    No transpose is needed — the intensity rows already correspond to q_ver
+    and columns already correspond to q_par after the vertical flip.
+
+    q_h_range and q_v_range are interpreted in the corrected axis convention
+    (q_par and q_ver respectively) and converted internally to the raw
+    FiberIntegrator ip_range/oop_range convention.
 
     Parameters:
     -----------
     :param data: 2D image in pixel
-    :type data: numpy 2D array of float
     :param ai: pyFAI FiberIntegrator (promoted from AzimuthalIntegrator)
-    :type ai: pyFAI.integrator.fiber.FiberIntegrator
-    :param npt: number of points for the binning in each direction.
-                If None the detector shape is used.
-    :type npt: int or None
-    :param q_h_range: (min, max) range for the in-plane q axis in A^-1
-    :type q_h_range: Tuple(float, float) or None
-    :param q_v_range: (min, max) range for the out-of-plane q axis in A^-1
-    :type q_v_range: Tuple(float, float) or None
-    :param method: pyFAI integration method
-    :type method: str
-    :param mask: mask array (1 = masked, 0 = valid) same shape as data
-    :type mask: numpy 2D array of bool/int or None
+    :param npt: number of points. Tuple (npt_qp, npt_qz), single int, or None.
+    :param q_h_range: (min, max) in-plane q_par range in A^-1
+    :param q_v_range: (min, max) out-of-plane q_ver range in A^-1
+    :param method: pyFAI integration method string
+    :param mask: mask array same shape as data (1=masked, 0=valid)
     :param incident_angle: grazing incident angle in radians
-    :type incident_angle: float
     :param tilt_angle: tilt angle in radians
-    :type tilt_angle: float
-    :param sample_orientation: FiberIntegrator sample orientation (1-8)
-    :type sample_orientation: int
+    :param sample_orientation: FiberIntegrator sample orientation (1-8), default 7
     """
 
-    # Derive number of points from data shape if not given
     if npt is None:
-        npt_ip  = data.shape[1]
-        npt_oop = data.shape[0]
-    
+        # intensity shape is (npt_ip rows, npt_oop cols).
+        # rows = q_ver = detector height = data.shape[0]
+        # cols = q_par = detector width  = data.shape[1]
+        npt_ip  = data.shape[0]
+        npt_oop = data.shape[1]
     elif isinstance(npt, (tuple, list)):
-        npt_ip, npt_oop = int(npt[1]), int(npt[0])
-    
+        # npt arrives from stitch.py as (npt_qp, npt_qz).
+        # rows = npt_ip = npt_qz = npt[1]
+        # cols = npt_oop = npt_qp = npt[0]
+        npt_ip  = int(npt[1])
+        npt_oop = int(npt[0])
     else:
         npt_ip  = int(npt)
         npt_oop = int(npt)
+
+    # q_h_range is in the corrected q_par convention where q_par = q_oop.
+    # Pass directly as oop_range — no conversion needed.
+    if q_h_range is not None:
+        oop_range = (q_h_range[0], q_h_range[1])
+    else:
+        oop_range = None
+
+    # q_v_range is in the corrected q_ver convention where q_ver = -q_ip.
+    # Convert to raw ip_range:
+    #   q_ver = -q_ip  →  q_ip = -q_ver
+    #   ip_range = (-q_v_range[1], -q_v_range[0])  (note the reversal of min/max)
+    if q_v_range is not None:
+        ip_range = (-q_v_range[1], -q_v_range[0])
+    else:
+        ip_range = None
 
     result = ai.integrate2d_grazing_incidence(
         data=data,
@@ -58,32 +84,24 @@ def remesh_gi(data, ai, npt=None, q_h_range=None, q_v_range=None, method='splitp
         tilt_angle=tilt_angle,
         unit_ip='qip_A^-1',
         unit_oop='qoop_A^-1',
-        ip_range=q_h_range,
-        oop_range=q_v_range,
+        ip_range=ip_range,
+        oop_range=oop_range,
         method=method,
         mask=mask,
     )
 
     intensity, q_ip, q_oop = result
 
-    # q_ip  is the in-plane axis  (equivalent to q_par in old pyGIX output)
-    # q_oop is the out-of-plane axis (equivalent to q_ver in old pyGIX output)
-    # The exact sign and direction depend on sample_orientation.
-    # stitch.py currently expects:
-    #   q_p_ini[:, i] = -x[::-1]   (Reflection scout pass)
-    #   q_z_ini[:, i] = y[::-1]
-    # These sign conventions will be verified/adjusted once the correct
-    # sample_orientation is confirmed via the diagnostic function below.
-    # print(f"  remesh_gi raw output: q_ip=[{q_ip.min():.4f}, {q_ip.max():.4f}]  q_oop=[{q_oop.min():.4f}, {q_oop.max():.4f}]")
-        # Also flip the intensity array axes to match the swap.
+    # Apply axis correction:
+    #   q_par (in-plane)     =  q_oop  (keep as-is)
+    #   q_ver (out-of-plane) = -q_ip   (negate → positive upward)
+    q_par =  q_oop
+    q_ver = -q_ip
 
-    q_par = -q_oop
-    q_ver =  q_ip  
-
-    # intensity shape is (npt_oop, npt_ip) = (rows=oop, cols=ip)
-    # After swapping axes, rows should be q_ver (ip) and cols should be q_par (oop)
-    # So we transpose and flip q_par axis
-    intensity_out = np.fliplr(intensity.T)
+    # intensity shape is (npt_ip, npt_oop) = (q_ver rows, q_par cols).
+    # flipud because q_ver = -q_ip reverses the row order.
+    # No transpose needed — axes are already in the correct orientation.
+    intensity_out = np.flipud(intensity)
 
     return intensity_out, q_par, q_ver
 
