@@ -6,44 +6,115 @@ import numpy as np
 from pyFAI.ext import splitBBox
 
 
-def remesh_gi(data, ai, npt=None, q_h_range=None, q_v_range=None, method='bbox' , mask=None,                 #method='bbox'
-              incident_angle=0.0, tilt_angle=0.0, sample_orientation=4):
+def remesh_gi(data, ai, npt=None, q_h_range=None, q_v_range=None, method='splitpix',
+              mask=None, incident_angle=0.0, tilt_angle=0.0, sample_orientation=4):
     """
-    Redraw the Grazing-Incidence image in (qp, qz) coordinates using pyGIX
+    Redraw the Grazing-Incidence image in (qip, qoop) coordinates using
+    pyFAI FiberIntegrator instead of pyGIX Transform.
 
     Parameters:
     -----------
     :param data: 2D image in pixel
     :type data: numpy 2D array of float
-    :param ai: pyGIX transform operator
-    :type ai: pyGIXTransform operator
-    :param npt: number of point for the binning
-    :type npt: int
-    :param q_h_range: Starting and ending point for the q_horizontal range
-    :type q_h_range: Tuple(float, float), optional
-    :param q_v_range: Starting and ending point for the q_vertical range
-    :type q_v_range: Tuple(float, float), optional
-    :param method: Method for the remeshing
-    :type method: String: 'splitbbox', ...
-    :param mask: Mask of the 2D raw image
-    :type mask: numpy 2D array of boolean
-    :param incident_angle: kept for API compatibility with stitch.py and xray_analysis.py
+    :param ai: pyFAI FiberIntegrator (promoted from AzimuthalIntegrator)
+    :type ai: pyFAI.integrator.fiber.FiberIntegrator
+    :param npt: number of points for the binning in each direction.
+                If None the detector shape is used.
+    :type npt: int or None
+    :param q_h_range: (min, max) range for the in-plane q axis in A^-1
+    :type q_h_range: Tuple(float, float) or None
+    :param q_v_range: (min, max) range for the out-of-plane q axis in A^-1
+    :type q_v_range: Tuple(float, float) or None
+    :param method: pyFAI integration method
+    :type method: str
+    :param mask: mask array (1 = masked, 0 = valid) same shape as data
+    :type mask: numpy 2D array of bool/int or None
+    :param incident_angle: grazing incident angle in radians
     :type incident_angle: float
-    :param tilt_angle: kept for API compatibility with stitch.py and xray_analysis.py
+    :param tilt_angle: tilt angle in radians
     :type tilt_angle: float
-    :param sample_orientation: kept for API compatibility with stitch.py and xray_analysis.py
+    :param sample_orientation: FiberIntegrator sample orientation (1-8)
     :type sample_orientation: int
     """
 
-    img, q_par, q_ver = ai.transform_reciprocal(data,
-                                                npt=npt,
-                                                ip_range=q_h_range,
-                                                op_range=q_v_range,
-                                                method=method,
-                                                unit='A',
-                                                mask=mask)
+    # Derive number of points from data shape if not given
+    if npt is None:
+        npt_ip  = data.shape[1]
+        npt_oop = data.shape[0]
+    elif isinstance(npt, (tuple, list)):
+        npt_ip, npt_oop = npt
+    else:
+        npt_ip  = npt
+        npt_oop = npt
 
-    return img, q_par, q_ver
+    result = ai.integrate2d_grazing_incidence(
+        data=data,
+        npt_ip=npt_ip,
+        npt_oop=npt_oop,
+        sample_orientation=sample_orientation,
+        incident_angle=incident_angle,
+        tilt_angle=tilt_angle,
+        unit_ip='qip_A^-1',
+        unit_oop='qoop_A^-1',
+        ip_range=q_h_range,
+        oop_range=q_v_range,
+        method=method,
+        mask=mask,
+    )
+
+    intensity, q_ip, q_oop = result
+
+    # q_ip  is the in-plane axis  (equivalent to q_par in old pyGIX output)
+    # q_oop is the out-of-plane axis (equivalent to q_ver in old pyGIX output)
+    # The exact sign and direction depend on sample_orientation.
+    # stitch.py currently expects:
+    #   q_p_ini[:, i] = -x[::-1]   (Reflection scout pass)
+    #   q_z_ini[:, i] = y[::-1]
+    # These sign conventions will be verified/adjusted once the correct
+    # sample_orientation is confirmed via the diagnostic function below.
+
+    return intensity, q_ip, q_oop
+
+
+
+# def remesh_gi(data, ai, npt=None, q_h_range=None, q_v_range=None, method='bbox' , mask=None,                 #method='bbox'
+#               incident_angle=0.0, tilt_angle=0.0, sample_orientation=4):
+#     """
+#     Redraw the Grazing-Incidence image in (qp, qz) coordinates using pyGIX
+
+#     Parameters:
+#     -----------
+#     :param data: 2D image in pixel
+#     :type data: numpy 2D array of float
+#     :param ai: pyGIX transform operator
+#     :type ai: pyGIXTransform operator
+#     :param npt: number of point for the binning
+#     :type npt: int
+#     :param q_h_range: Starting and ending point for the q_horizontal range
+#     :type q_h_range: Tuple(float, float), optional
+#     :param q_v_range: Starting and ending point for the q_vertical range
+#     :type q_v_range: Tuple(float, float), optional
+#     :param method: Method for the remeshing
+#     :type method: String: 'splitbbox', ...
+#     :param mask: Mask of the 2D raw image
+#     :type mask: numpy 2D array of boolean
+#     :param incident_angle: kept for API compatibility with stitch.py and xray_analysis.py
+#     :type incident_angle: float
+#     :param tilt_angle: kept for API compatibility with stitch.py and xray_analysis.py
+#     :type tilt_angle: float
+#     :param sample_orientation: kept for API compatibility with stitch.py and xray_analysis.py
+#     :type sample_orientation: int
+#     """
+
+#     img, q_par, q_ver = ai.transform_reciprocal(data,
+#                                                 npt=npt,
+#                                                 ip_range=q_h_range,
+#                                                 op_range=q_v_range,
+#                                                 method=method,
+#                                                 unit='A',
+#                                                 mask=mask)
+
+#     return img, q_par, q_ver
 
 
 def remesh_transmission(image, ai, bins=None, q_h_range=None, q_v_range=None, mask=None):

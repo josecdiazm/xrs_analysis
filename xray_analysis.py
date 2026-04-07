@@ -214,15 +214,39 @@ class xray_geometry():
 
 
     def calculate_integrator_gi(self, det_rots):
-        ai = Transform(wavelength=self.wav, detector=self.det, incident_angle=self.alphai)
-        ai.setFit2D(directDist=self.sdd, centerX=self.center[0], centerY=self.center[1])
-        ai.set_incident_angle(self.alphai)
+        # ai = Transform(wavelength=self.wav, detector=self.det, incident_angle=self.alphai)
+        # ai.setFit2D(directDist=self.sdd, centerX=self.center[0], centerY=self.center[1])
+        # ai.set_incident_angle(self.alphai)
 
-        for i, det_rot in enumerate(det_rots):
-            ai_temp = copy.deepcopy(ai)
-            ai_temp.rot1 = det_rot
-            ai_temp.set_incident_angle(self.alphai)
-            self.ai.append(ai_temp)
+        # for i, det_rot in enumerate(det_rots):
+        #     ai_temp = copy.deepcopy(ai)
+        #     ai_temp.rot1 = det_rot
+        #     ai_temp.set_incident_angle(self.alphai)
+        #     self.ai.append(ai_temp)
+        
+        from pyFAI import azimuthalIntegrator
+        import copy
+
+        self.ai = []
+
+        # Build a base AzimuthalIntegrator exactly as in calculate_integrator_trans
+        base_ai = azimuthalIntegrator.AzimuthalIntegrator(
+            detector=self.det,
+            rot1=0,
+            rot2=0,
+            rot3=0,
+        )
+        base_ai.setFit2D(self.sdd, self.center[0], self.center[1])
+        base_ai.set_wavelength(self.wav)
+
+        # Promote once to FiberIntegrator, then deep-copy per angle
+        base_fi = base_ai.promote(type_="pyFAI.integrator.fiber.FiberIntegrator")
+
+        for det_rot in det_rots:
+            fi_temp = copy.deepcopy(base_fi)
+            fi_temp.rot1 = det_rot
+            self.ai.append(fi_temp)
+
 
 
     def calculate_integrator_gi2(self, det_rots):
