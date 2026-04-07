@@ -43,7 +43,7 @@ def remesh_gi(data, ai, npt=None, q_h_range=None, q_v_range=None, method='splitp
         npt_oop = data.shape[0]
     
     elif isinstance(npt, (tuple, list)):
-        npt_ip, npt_oop = int(npt[0]), int(npt[1])
+        npt_ip, npt_oop = int(npt[1]), int(npt[0])
     
     else:
         npt_ip  = int(npt)
