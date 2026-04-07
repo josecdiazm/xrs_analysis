@@ -1,4 +1,3 @@
-
 # %%
 
 
@@ -29,20 +28,13 @@ def stitching(datas, ais, masks, geometry='Reflection', interp_factor=2,
                             configuration. If provided, the expensive scout remesh pass and
                             mask remesh are skipped entirely.
     :param incident_angle: grazing incident angle in radians (Reflection geometry only)
-    :type incident_angle: float
     :param tilt_angle: tilt angle in radians (Reflection geometry only)
-    :type tilt_angle: float
     :param sample_orientation: FiberIntegrator sample orientation 1-8 (Reflection geometry only)
-    :type sample_orientation: int
     '''
 
     if _cached_qranges is None:
         # -----------------------------------------------------------------------
-        # SCOUT PASS: run remesh once per image just to find the q-space extent
-        # and the per-image q-ranges needed for stitching overlap calculation.
-        # This only runs on the very first call for a given geometry setup.
-        # For fixed geometry (same detector, SDD, beam center, wavelength, alphai)
-        # the result is identical every time, so we cache and skip it after.
+        # SCOUT PASS: run remesh once per image just to find the q-space extent.
         # -----------------------------------------------------------------------
         for i, (data, ai, mask) in enumerate(zip(datas, ais, masks)):
 
@@ -55,12 +47,12 @@ def stitching(datas, ais, masks, geometry='Reflection', interp_factor=2,
                     q_p_ini = np.zeros((np.shape(x)[0], len(datas)))
                     q_z_ini = np.zeros((np.shape(y)[0], len(datas)))
 
-                # CHANGED from original:
-                # Old pyGIX used -x[::-1] and y[::-1] to flip axes.
-                # FiberIntegrator orientation 4 returns q_ip as 0→+max and
-                # q_oop as mostly 0→+max, so no sign flip or reversal is needed.
-                q_p_ini[:len(x), i] = x       # was: -x[::-1]
-                q_z_ini[:len(y), i] = y        # was: y[::-1]
+                # FiberIntegrator orientation 4 returns fully signed q values:
+                # q_ip  : min ~ -0.08, max ~ +0.28  (beam center near left edge)
+                # q_oop : min ~ -0.10, max ~ +0.31  (beam center near bottom)
+                # Use them directly — no sign flip or reversal needed.
+                q_p_ini[:len(x), i] = x
+                q_z_ini[:len(y), i] = y
 
             elif geometry == 'Transmission':
                 img, x, y, resc_q = remesh.remesh_transmission(data, ai, mask=mask)
@@ -77,60 +69,29 @@ def stitching(datas, ais, masks, geometry='Reflection', interp_factor=2,
             nb_point += len(q_p_ini[:, i]) - y_idx
 
         nb_point  = nb_point * interp_factor
-        
-        # qp_remesh = np.linspace(min(q_p_ini[:, 0]), max(q_p_ini[:, -1]), nb_point)
-        # qz_remesh = np.linspace(
-        #     min(q_z_ini[:, 0]), max(q_z_ini[:, -1]),
-        #     int(nb_point * abs(max(q_z_ini[:, -1]) - min(q_z_ini[:, 0])) /
-        #         abs(max(q_p_ini[:, -1]) - min(q_p_ini[:, 0])))
-        # )
-        if geometry == 'Reflection':
-        # Orientation 4 returns q_ip as 0→+max (all positive).
-        # We force a symmetric range around 0 so the beam center
-        # sits at the middle of the horizontal axis, matching the
-        # physical reality that scattering is symmetric in q_ip.
-            qp_max    = max(q_p_ini[:, -1])
-            qp_remesh = np.linspace(-qp_max, qp_max, nb_point)
-        else:
-            qp_remesh = np.linspace(min(q_p_ini[:, 0]), max(q_p_ini[:, -1]), nb_point)
 
+        # Use the signed q ranges directly for both geometries.
+        # For Reflection with orientation 4, q_p_ini already spans negative
+        # to positive correctly — no symmetric grid construction needed.
+        qp_remesh = np.linspace(min(q_p_ini[:, 0]), max(q_p_ini[:, -1]), nb_point)
         qz_remesh = np.linspace(
             min(q_z_ini[:, 0]), max(q_z_ini[:, -1]),
             int(nb_point * abs(max(q_z_ini[:, -1]) - min(q_z_ini[:, 0])) /
-                abs(qp_remesh[-1] - qp_remesh[0]))
+                abs(max(q_p_ini[:, -1]) - min(q_p_ini[:, 0])))
         )
 
-
-
         # -------------------------------------------------------------------
-        # Remesh the masks once here during the scout pass and cache them.
-        # The mask only depends on geometry and beamstop position, not on the
-        # image data, so it is identical for every file in a batch run.
+        # Remesh the masks once and cache them.
         # -------------------------------------------------------------------
         cached_qmasks = []
 
         for i, (ai, mask) in enumerate(zip(ais, masks)):
 
-            # qp_start = np.argmin(abs(qp_remesh - np.min(q_p_ini[:, i])))
-            # qp_stop  = np.argmin(abs(qp_remesh - np.max(q_p_ini[:, i])))
-            # npt = (int(qp_stop - qp_start), int(np.shape(qz_remesh)[0]))
+            qp_start = np.argmin(abs(qp_remesh - np.min(q_p_ini[:, i])))
+            qp_stop  = np.argmin(abs(qp_remesh - np.max(q_p_ini[:, i])))
+            npt      = (int(qp_stop - qp_start), int(np.shape(qz_remesh)[0]))
 
             if geometry == 'Reflection':
-                # Data occupies the right half of the symmetric grid (q_ip >= 0).
-                # qp_start is pinned to q_ip=0 (midpoint of qp_remesh).
-                qp_start = np.argmin(abs(qp_remesh - 0.0))
-                qp_stop  = np.argmin(abs(qp_remesh - np.max(q_p_ini[:, i])))
-            else:
-                qp_start = np.argmin(abs(qp_remesh - np.min(q_p_ini[:, i])))
-                qp_stop  = np.argmin(abs(qp_remesh - np.max(q_p_ini[:, i])))
-
-            npt = (int(qp_stop - qp_start), int(np.shape(qz_remesh)[0]))
-
-
-            if geometry == 'Reflection':
-                # CHANGED from original:
-                # Old: ip_range = (-qp_remesh[qp_stop], -qp_remesh[qp_start])
-                # FiberIntegrator orientation 4 uses positive q_ip directly.
                 ip_range = (qp_remesh[qp_start], qp_remesh[qp_stop])
                 op_range = (qz_remesh[0], qz_remesh[-1])
                 msk, _, _ = remesh.remesh_gi(mask.astype(int), ai, npt=npt,
@@ -139,10 +100,6 @@ def stitching(datas, ais, masks, geometry='Reflection', interp_factor=2,
                                              incident_angle=incident_angle,
                                              tilt_angle=tilt_angle,
                                              sample_orientation=sample_orientation)
-
-                # CHANGED from original:
-                # Old: cached_qmasks.append(np.rot90(msk, 2))
-                # No rotation needed — orientation 4 is already correctly oriented.
                 cached_qmasks.append(msk)
 
             elif geometry == 'Transmission':
@@ -155,11 +112,7 @@ def stitching(datas, ais, masks, geometry='Reflection', interp_factor=2,
 
     else:
         # -----------------------------------------------------------------------
-        # CACHED PATH: geometry hasn't changed, reuse everything from last time.
-        # This saves the entire scout remesh pass and mask remesh pass.
-        # q_p_ini and q_z_ini are also cached because they are needed to compute
-        # the per-image qp_start/qp_stop overlap positions during stitching,
-        # and those positions depend only on the detector angles, not the data.
+        # CACHED PATH: reuse everything from the previous call.
         # -----------------------------------------------------------------------
         qp_remesh     = _cached_qranges['qp_remesh']
         qz_remesh     = _cached_qranges['qz_remesh']
@@ -169,42 +122,24 @@ def stitching(datas, ais, masks, geometry='Reflection', interp_factor=2,
 
     # ---------------------------------------------------------------------------
     # MAIN PASS: remesh each image onto the target q-grid and stitch.
-    # The mask remesh is now skipped here entirely — we use the cached version.
     # ---------------------------------------------------------------------------
     for i, (data, ai, mask) in enumerate(zip(datas, ais, masks)):
 
-        # qp_start = np.argmin(abs(qp_remesh - np.min(q_p_ini[:, i])))
-        # qp_stop  = np.argmin(abs(qp_remesh - np.max(q_p_ini[:, i])))
-        # npt = (int(qp_stop - qp_start), int(np.shape(qz_remesh)[0]))
+        qp_start = np.argmin(abs(qp_remesh - np.min(q_p_ini[:, i])))
+        qp_stop  = np.argmin(abs(qp_remesh - np.max(q_p_ini[:, i])))
+        npt      = (int(qp_stop - qp_start), int(np.shape(qz_remesh)[0]))
+        qmask    = cached_qmasks[i]
 
         if geometry == 'Reflection':
-            qp_start = np.argmin(abs(qp_remesh - 0.0))
-            qp_stop  = np.argmin(abs(qp_remesh - np.max(q_p_ini[:, i])))
-        else:
-            qp_start = np.argmin(abs(qp_remesh - np.min(q_p_ini[:, i])))
-            qp_stop  = np.argmin(abs(qp_remesh - np.max(q_p_ini[:, i])))
-
-        npt   = (int(qp_stop - qp_start), int(np.shape(qz_remesh)[0]))
-        # Use the cached remeshed mask instead of recomputing it
-        qmask = cached_qmasks[i]
-
-        if geometry == 'Reflection':
-            # CHANGED from original:
-            # Old: ip_range = (-qp_remesh[qp_stop], -qp_remesh[qp_start])
-            # FiberIntegrator orientation 4 uses positive q_ip directly.
             ip_range = (qp_remesh[qp_start], qp_remesh[qp_stop])
             op_range = (qz_remesh[0], qz_remesh[-1])
-
             img, x, y = remesh.remesh_gi(data, ai, npt=npt,
                                          q_h_range=ip_range, q_v_range=op_range,
                                          mask=mask,
                                          incident_angle=incident_angle,
                                          tilt_angle=tilt_angle,
                                          sample_orientation=sample_orientation)
-
-            # CHANGED from original:
-            # Old: qimage = np.rot90(img, 2)
-            # No rotation needed — orientation 4 is already correctly oriented.
+            # Orientation 4 is already correctly oriented — no rotation needed.
             qimage = img
 
         elif geometry == 'Transmission':
@@ -221,11 +156,11 @@ def stitching(datas, ais, masks, geometry='Reflection', interp_factor=2,
             sca1 = np.zeros(np.shape(img_te))
             sca2 = np.zeros(np.shape(img_te))
             sca3 = np.zeros(np.shape(img_te))
-            img_te[:, :np.shape(qimage)[1]]  = qimage
-            img_mask[:, :np.shape(qmask)[1]] += np.logical_not(qmask).astype(int)
-            sca[np.nonzero(qimage)]  += 1
-            sca2[np.nonzero(qimage)] += 1
-            sca3[np.nonzero(qimage)] += 1
+            img_te[:, qp_start:qp_start + np.shape(qimage)[1]]   = qimage
+            img_mask[:, qp_start:qp_start + np.shape(qmask)[1]] += np.logical_not(qmask).astype(int)
+            sca[np.nonzero(img_te)]  += 1
+            sca2[np.nonzero(img_te)] += 1
+            sca3[np.nonzero(img_te)] += 1
             scale  = 1.
             scales = [scale]
 
@@ -288,15 +223,8 @@ def stitching(datas, ais, masks, geometry='Reflection', interp_factor=2,
     img      = img_te / sca2
     mask_out = (img_mask.astype(bool)).astype(int)
 
-    # CHANGED from original:
-    # Old: if geometry == 'Reflection': img = np.flipud(img)
     # No flipud needed — orientation 4 already has q_oop increasing upward.
-
-    # CHANGED from original:
-    # Old: qp_out = [qp_remesh.min(), qp_remesh.max()]
-    #      qz_out = [-qz_remesh.max(), -qz_remesh.min()]
-    # FiberIntegrator orientation 4 returns positive q values directly,
-    # so no sign flip is needed on the output q ranges.
+    # q ranges are signed correctly directly from the FiberIntegrator output.
     qp_out = [qp_remesh.min(), qp_remesh.max()]
     qz_out = [qz_remesh.min(), qz_remesh.max()]
 
@@ -351,10 +279,6 @@ def translation_stitching(datas, masks=None, pys=None, pxs=None):
 
 
 # %%
-
-
-
-
 
 
 
