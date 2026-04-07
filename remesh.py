@@ -41,11 +41,13 @@ def remesh_gi(data, ai, npt=None, q_h_range=None, q_v_range=None, method='splitp
     if npt is None:
         npt_ip  = data.shape[1]
         npt_oop = data.shape[0]
+    
     elif isinstance(npt, (tuple, list)):
-        npt_ip, npt_oop = npt
+        npt_ip, npt_oop = int(npt[0]), int(npt[1])
+    
     else:
-        npt_ip  = npt
-        npt_oop = npt
+        npt_ip  = int(npt)
+        npt_oop = int(npt)
 
     result = ai.integrate2d_grazing_incidence(
         data=data,
