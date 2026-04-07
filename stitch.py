@@ -30,39 +30,17 @@ def stitching(datas, ais, masks, geometry='Reflection', interp_factor=2,
     '''
 
     if _cached_qranges is None:
-        # -----------------------------------------------------------------------
-        # SCOUT PASS
-        # -----------------------------------------------------------------------
+
         for i, (data, ai, mask) in enumerate(zip(datas, ais, masks)):
-
-
-            # Add these right after the scout for loop, before nb_point calculation
-            print("=== RAW SCOUT RESULTS ===")
-            for i in range(q_p_ini.shape[1]):
-                print(f"  Image {i}: q_p_ini min={np.nanmin(q_p_ini[:,i]):.4f}  max={np.nanmax(q_p_ini[:,i]):.4f}")
-                print(f"  Image {i}: q_z_ini min={np.nanmin(q_z_ini[:,i]):.4f}  max={np.nanmax(q_z_ini[:,i]):.4f}")
-            
-            print(f"\n=== AFTER nb_point ===")
-            print(f"  nb_point (before interp_factor): {nb_point // interp_factor}")
-            print(f"  nb_point (after  interp_factor): {nb_point}")
-            
-            # Add these right after qz_remesh is computed
-            print(f"\n=== REMESH GRIDS ===")
-            print(f"  qp_remesh: min={qp_remesh.min():.4f}  max={qp_remesh.max():.4f}  npts={len(qp_remesh)}")
-            print(f"  qz_remesh: min={qz_remesh.min():.4f}  max={qz_remesh.max():.4f}  npts={len(qz_remesh)}")
-
+            # <-- this is the scout loop body, indented one level inside the for
             if geometry == 'Reflection':
                 img, x, y = remesh.remesh_gi(data, ai, mask=mask,
                                              incident_angle=incident_angle,
                                              tilt_angle=tilt_angle,
                                              sample_orientation=sample_orientation)
                 if i == 0:
-                    # NaN-initialised so that unfilled padding rows do not
-                    # corrupt nanmin/nanmax calculations when images differ
-                    # in q-extent (e.g. Pilatus900kw multi-panel stitching).
                     q_p_ini = np.full((np.shape(x)[0], len(datas)), np.nan)
                     q_z_ini = np.full((np.shape(y)[0], len(datas)), np.nan)
-
                 q_p_ini[:len(x), i] = x
                 q_z_ini[:len(y), i] = y
 
@@ -71,16 +49,21 @@ def stitching(datas, ais, masks, geometry='Reflection', interp_factor=2,
                 if i == 0:
                     q_p_ini = np.full((np.shape(x)[0], len(datas)), np.nan)
                     q_z_ini = np.full((np.shape(y)[0], len(datas)), np.nan)
-
                 q_p_ini[:len(x), i] = x
                 q_z_ini[:len(y), i] = y
+
+        # <-- THIS IS OUTSIDE THE FOR LOOP (same indent level as the for statement)
+        print("=== RAW SCOUT RESULTS ===")
+        for j in range(q_p_ini.shape[1]):
+            print(f"  Image {j}: q_p_ini min={np.nanmin(q_p_ini[:,j]):.4f}  max={np.nanmax(q_p_ini[:,j]):.4f}")
+            print(f"  Image {j}: q_z_ini min={np.nanmin(q_z_ini[:,j]):.4f}  max={np.nanmax(q_z_ini[:,j]):.4f}")
 
         nb_point = len(q_p_ini[:, 0])
         for i in range(1, np.shape(q_p_ini)[1], 1):
             y_idx = np.argmin(abs(q_p_ini[:, i - 1] - np.nanmin(q_p_ini[:, i])))
             nb_point += len(q_p_ini[:, i]) - y_idx
 
-        nb_point  = nb_point * interp_factor
+        nb_point = nb_point * interp_factor
 
         qp_remesh = np.linspace(np.nanmin(q_p_ini), np.nanmax(q_p_ini), nb_point)
         qz_remesh = np.linspace(
@@ -88,6 +71,10 @@ def stitching(datas, ais, masks, geometry='Reflection', interp_factor=2,
             int(nb_point * abs(np.nanmax(q_z_ini) - np.nanmin(q_z_ini)) /
                 abs(np.nanmax(q_p_ini) - np.nanmin(q_p_ini)))
         )
+
+        print(f"\n=== REMESH GRIDS ===")
+        print(f"  qp_remesh: min={qp_remesh.min():.4f}  max={qp_remesh.max():.4f}  npts={len(qp_remesh)}")
+        print(f"  qz_remesh: min={qz_remesh.min():.4f}  max={qz_remesh.max():.4f}  npts={len(qz_remesh)}")
 
         # -------------------------------------------------------------------
         # Remesh the masks once and cache them.
