@@ -77,12 +77,30 @@ def stitching(datas, ais, masks, geometry='Reflection', interp_factor=2,
             nb_point += len(q_p_ini[:, i]) - y_idx
 
         nb_point  = nb_point * interp_factor
-        qp_remesh = np.linspace(min(q_p_ini[:, 0]), max(q_p_ini[:, -1]), nb_point)
+        
+        # qp_remesh = np.linspace(min(q_p_ini[:, 0]), max(q_p_ini[:, -1]), nb_point)
+        # qz_remesh = np.linspace(
+        #     min(q_z_ini[:, 0]), max(q_z_ini[:, -1]),
+        #     int(nb_point * abs(max(q_z_ini[:, -1]) - min(q_z_ini[:, 0])) /
+        #         abs(max(q_p_ini[:, -1]) - min(q_p_ini[:, 0])))
+        # )
+        if geometry == 'Reflection':
+        # Orientation 4 returns q_ip as 0→+max (all positive).
+        # We force a symmetric range around 0 so the beam center
+        # sits at the middle of the horizontal axis, matching the
+        # physical reality that scattering is symmetric in q_ip.
+            qp_max    = max(q_p_ini[:, -1])
+            qp_remesh = np.linspace(-qp_max, qp_max, nb_point)
+        else:
+            qp_remesh = np.linspace(min(q_p_ini[:, 0]), max(q_p_ini[:, -1]), nb_point)
+
         qz_remesh = np.linspace(
             min(q_z_ini[:, 0]), max(q_z_ini[:, -1]),
             int(nb_point * abs(max(q_z_ini[:, -1]) - min(q_z_ini[:, 0])) /
-                abs(max(q_p_ini[:, -1]) - min(q_p_ini[:, 0])))
+                abs(max(qp_remesh[-1]) - min(qp_remesh[0])))
         )
+
+
 
         # -------------------------------------------------------------------
         # Remesh the masks once here during the scout pass and cache them.
@@ -93,9 +111,21 @@ def stitching(datas, ais, masks, geometry='Reflection', interp_factor=2,
 
         for i, (ai, mask) in enumerate(zip(ais, masks)):
 
-            qp_start = np.argmin(abs(qp_remesh - np.min(q_p_ini[:, i])))
-            qp_stop  = np.argmin(abs(qp_remesh - np.max(q_p_ini[:, i])))
+            # qp_start = np.argmin(abs(qp_remesh - np.min(q_p_ini[:, i])))
+            # qp_stop  = np.argmin(abs(qp_remesh - np.max(q_p_ini[:, i])))
+            # npt = (int(qp_stop - qp_start), int(np.shape(qz_remesh)[0]))
+
+            if geometry == 'Reflection':
+                # Data occupies the right half of the symmetric grid (q_ip >= 0).
+                # qp_start is pinned to q_ip=0 (midpoint of qp_remesh).
+                qp_start = np.argmin(abs(qp_remesh - 0.0))
+                qp_stop  = np.argmin(abs(qp_remesh - np.max(q_p_ini[:, i])))
+            else:
+                qp_start = np.argmin(abs(qp_remesh - np.min(q_p_ini[:, i])))
+                qp_stop  = np.argmin(abs(qp_remesh - np.max(q_p_ini[:, i])))
+
             npt = (int(qp_stop - qp_start), int(np.shape(qz_remesh)[0]))
+
 
             if geometry == 'Reflection':
                 # CHANGED from original:
@@ -143,10 +173,18 @@ def stitching(datas, ais, masks, geometry='Reflection', interp_factor=2,
     # ---------------------------------------------------------------------------
     for i, (data, ai, mask) in enumerate(zip(datas, ais, masks)):
 
-        qp_start = np.argmin(abs(qp_remesh - np.min(q_p_ini[:, i])))
-        qp_stop  = np.argmin(abs(qp_remesh - np.max(q_p_ini[:, i])))
-        npt = (int(qp_stop - qp_start), int(np.shape(qz_remesh)[0]))
+        # qp_start = np.argmin(abs(qp_remesh - np.min(q_p_ini[:, i])))
+        # qp_stop  = np.argmin(abs(qp_remesh - np.max(q_p_ini[:, i])))
+        # npt = (int(qp_stop - qp_start), int(np.shape(qz_remesh)[0]))
 
+        if geometry == 'Reflection':
+            qp_start = np.argmin(abs(qp_remesh - 0.0))
+            qp_stop  = np.argmin(abs(qp_remesh - np.max(q_p_ini[:, i])))
+        else:
+            qp_start = np.argmin(abs(qp_remesh - np.min(q_p_ini[:, i])))
+            qp_stop  = np.argmin(abs(qp_remesh - np.max(q_p_ini[:, i])))
+
+        npt   = (int(qp_stop - qp_start), int(np.shape(qz_remesh)[0]))
         # Use the cached remeshed mask instead of recomputing it
         qmask = cached_qmasks[i]
 
