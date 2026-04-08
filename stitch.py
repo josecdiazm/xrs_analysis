@@ -54,7 +54,7 @@ def stitching(datas, ais, masks, geometry='Reflection', interp_factor=2,
                     q_z_ini = np.zeros((np.shape(y)[0], len(datas)))
 
                 q_p_ini[:len(x), i] = x
-                q_z_ini[:len(y), i] = -y #y
+                q_z_ini[:len(y), i] = y
 
             elif geometry == 'Transmission':
                 img, x, y, resc_q = remesh.remesh_transmission(data, ai, mask=mask)
@@ -64,12 +64,7 @@ def stitching(datas, ais, masks, geometry='Reflection', interp_factor=2,
 
                 q_p_ini[:len(x), i] = x
                 q_z_ini[:len(y), i] = y
-
-        print("q_p_ini column 0:", q_p_ini[:, 0].min(), q_p_ini[:, 0].max())
-        print("q_z_ini column 0:", q_z_ini[:, 0].min(), q_z_ini[:, 0].max())
-        print("x min/max from remesh_gi:", x.min(), x.max())
-        print("y min/max from remesh_gi:", y.min(), y.max())
-
+        
         nb_point = len(q_p_ini[:, 0])
         for i in range(1, np.shape(q_p_ini)[1], 1):
             y_idx = np.argmin(abs(q_p_ini[:, i - 1] - np.min(q_p_ini[:, i])))
@@ -230,7 +225,7 @@ def stitching(datas, ais, masks, geometry='Reflection', interp_factor=2,
         img = np.flipud(img)
 
     qp_out = [qp_remesh.min(), qp_remesh.max()]
-    qz_out = [-qz_remesh.max(), -qz_remesh.min()]
+    qz_out = [qz_remesh.max(), qz_remesh.min()]
 
     if resc_q:
         qp_out[:] = [v * 10 for v in qp_out]
