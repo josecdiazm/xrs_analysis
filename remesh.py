@@ -49,21 +49,13 @@ def remesh_gi(data, ai, npt=None, q_h_range=None, q_v_range=None, method='splitp
         fi = ai
 
     if npt is None:
-        # Use the detector pixel dimensions as the default bin count.
-        # This ensures the first binning step is never coarser than the
-        # raw data, which prevents the square grid artifact that appears
-        # when a coarse fixed grid (e.g. 1000x1000) is resampled onto
-        # the finer qp_remesh/qz_remesh grid built by stitch.py.
-        # We derive the shape from the data array itself so this works
-        # for any detector without hardcoding.
-        npt_ip  = data.shape[1]  # number of columns -> in-plane
-        npt_oop = data.shape[0]  # number of rows    -> out-of-plane
+        npt_ip  = 10000
+        npt_oop = 10000
     elif isinstance(npt, (tuple, list)):
         npt_ip, npt_oop = npt
     else:
         npt_ip  = npt
         npt_oop = npt
-
 
     result = fi.integrate2d_grazing_incidence(
         data=data,
