@@ -64,6 +64,11 @@ def stitching(datas, ais, masks, geometry='Reflection', interp_factor=2,
 
                 q_p_ini[:len(x), i] = x
                 q_z_ini[:len(y), i] = y
+                
+        print("q_p_ini column 0:", q_p_ini[:, 0].min(), q_p_ini[:, 0].max())
+        print("q_z_ini column 0:", q_z_ini[:, 0].min(), q_z_ini[:, 0].max())
+        print("x min/max from remesh_gi:", x.min(), x.max())
+        print("y min/max from remesh_gi:", y.min(), y.max())
 
         nb_point = len(q_p_ini[:, 0])
         for i in range(1, np.shape(q_p_ini)[1], 1):
