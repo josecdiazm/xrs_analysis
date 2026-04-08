@@ -31,15 +31,13 @@ def stitching(datas, ais, masks, geometry='Reflection', interp_factor=2,
     :type incident_angle: float
     :param tilt_angle: tilt angle in radians (Reflection geometry only)
     :type tilt_angle: float
-    :param sample_orientation: FiberIntegrator sample orientation integer 1-8 (Reflection geometry only).
-                               Default is 4 to match SMI Reflection geometry.
+    :param sample_orientation: FiberIntegrator sample orientation integer 1-8 (Reflection only)
     :type sample_orientation: int
     '''
 
     if _cached_qranges is None:
         # -----------------------------------------------------------------------
-        # SCOUT PASS: run remesh once per image just to find the q-space extent
-        # and the per-image q-ranges needed for stitching overlap calculation.
+        # SCOUT PASS
         # -----------------------------------------------------------------------
         for i, (data, ai, mask) in enumerate(zip(datas, ais, masks)):
 
@@ -53,8 +51,10 @@ def stitching(datas, ais, masks, geometry='Reflection', interp_factor=2,
                     q_p_ini = np.zeros((np.shape(x)[0], len(datas)))
                     q_z_ini = np.zeros((np.shape(y)[0], len(datas)))
 
+                # FiberIntegrator returns qip and qoop already in the correct
+                # sign convention. Store directly without any sign flip.
                 q_p_ini[:len(x), i] = x
-                q_z_ini[:len(y), i] = -y[::-1] #y
+                q_z_ini[:len(y), i] = y
 
             elif geometry == 'Transmission':
                 img, x, y, resc_q = remesh.remesh_transmission(data, ai, mask=mask)
@@ -65,11 +65,6 @@ def stitching(datas, ais, masks, geometry='Reflection', interp_factor=2,
                 q_p_ini[:len(x), i] = x
                 q_z_ini[:len(y), i] = y
 
-        print("q_p_ini column 0:", q_p_ini[:, 0].min(), q_p_ini[:, 0].max())
-        print("q_z_ini column 0:", q_z_ini[:, 0].min(), q_z_ini[:, 0].max())
-        print("x min/max from remesh_gi:", x.min(), x.max())
-        print("y min/max from remesh_gi:", y.min(), y.max())
-
         nb_point = len(q_p_ini[:, 0])
         for i in range(1, np.shape(q_p_ini)[1], 1):
             y_idx = np.argmin(abs(q_p_ini[:, i - 1] - np.min(q_p_ini[:, i])))
@@ -77,9 +72,20 @@ def stitching(datas, ais, masks, geometry='Reflection', interp_factor=2,
 
         nb_point = nb_point * interp_factor
         qp_remesh = np.linspace(min(q_p_ini[:, 0]), max(q_p_ini[:, -1]), nb_point)
+
+        # For Reflection geometry, we only want the positive qz range (above horizon).
+        # FiberIntegrator returns qoop spanning slightly negative to positive.
+        # We clamp the lower bound to 0 to discard the unphysical below-horizon region.
+        if geometry == 'Reflection':
+            qz_min = max(0.0, min(q_z_ini[:, 0]))
+            qz_max = max(q_z_ini[:, -1])
+        else:
+            qz_min = min(q_z_ini[:, 0])
+            qz_max = max(q_z_ini[:, -1])
+
         qz_remesh = np.linspace(
-            min(q_z_ini[:, 0]), max(q_z_ini[:, -1]),
-            int(nb_point * abs(max(q_z_ini[:, -1]) - min(q_z_ini[:, 0])) /
+            qz_min, qz_max,
+            int(nb_point * abs(qz_max - qz_min) /
                 abs(max(q_p_ini[:, -1]) - min(q_p_ini[:, 0])))
         )
 
@@ -104,7 +110,7 @@ def stitching(datas, ais, masks, geometry='Reflection', interp_factor=2,
                                              tilt_angle=tilt_angle,
                                              sample_orientation=sample_orientation,
                                              method='splitpix')
-                cached_qmasks.append(np.flipud(msk))
+                cached_qmasks.append(msk)
 
             elif geometry == 'Transmission':
                 ip_range = (qp_remesh[qp_start], qp_remesh[qp_stop])
@@ -116,7 +122,7 @@ def stitching(datas, ais, masks, geometry='Reflection', interp_factor=2,
 
     else:
         # -----------------------------------------------------------------------
-        # CACHED PATH: geometry hasn't changed, reuse everything from last time.
+        # CACHED PATH
         # -----------------------------------------------------------------------
         qp_remesh     = _cached_qranges['qp_remesh']
         qz_remesh     = _cached_qranges['qz_remesh']
@@ -125,7 +131,7 @@ def stitching(datas, ais, masks, geometry='Reflection', interp_factor=2,
         cached_qmasks = _cached_qranges['qmasks']
 
     # ---------------------------------------------------------------------------
-    # MAIN PASS: remesh each image onto the target q-grid and stitch.
+    # MAIN PASS
     # ---------------------------------------------------------------------------
     for i, (data, ai, mask) in enumerate(zip(datas, ais, masks)):
 
@@ -137,8 +143,7 @@ def stitching(datas, ais, masks, geometry='Reflection', interp_factor=2,
 
         if geometry == 'Reflection':
             ip_range = (qp_remesh[qp_start], qp_remesh[qp_stop])
-            op_range = (-qz_remesh[-1], -qz_remesh[0])
-            # op_range = (qz_remesh[0], qz_remesh[-1])
+            op_range = (qz_remesh[0], qz_remesh[-1])
 
             img, x, y = remesh.remesh_gi(data, ai, npt=npt,
                                          q_h_range=ip_range, q_v_range=op_range,
@@ -147,7 +152,9 @@ def stitching(datas, ais, masks, geometry='Reflection', interp_factor=2,
                                          tilt_angle=tilt_angle,
                                          sample_orientation=sample_orientation,
                                          method='splitpix')
-            qimage = np.flipud(img)
+            # No flip needed — FiberIntegrator already returns qoop increasing
+            # upward with positive qz above the horizon.
+            qimage = img
 
         elif geometry == 'Transmission':
             ip_range = (qp_remesh[qp_start], qp_remesh[qp_stop])
@@ -227,11 +234,10 @@ def stitching(datas, ais, masks, geometry='Reflection', interp_factor=2,
     img = img_te / sca2
     mask_out = (img_mask.astype(bool)).astype(int)
 
-    if geometry == 'Reflection':
-        img = np.flipud(img)
+    # No flipud needed for Reflection — FiberIntegrator already orients qz correctly.
 
     qp_out = [qp_remesh.min(), qp_remesh.max()]
-    qz_out = [-qz_remesh.max(), -qz_remesh.min()]
+    qz_out = [qz_remesh.min(), qz_remesh.max()]
 
     if resc_q:
         qp_out[:] = [v * 10 for v in qp_out]
@@ -285,6 +291,7 @@ def translation_stitching(datas, masks=None, pys=None, pxs=None):
 
 
 # %%
+
 
 
 
