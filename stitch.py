@@ -49,7 +49,7 @@ def stitching(datas, ais, masks, geometry='Reflection', interp_factor=2,
                 img, x, y = remesh.remesh_gi(data, ai, mask=mask,
                                              incident_angle=incident_angle,
                                              tilt_angle=tilt_angle,
-                                             sample_orientation=sample_orientation, method='lut_ocl')    # method='splitbbox',
+                                             sample_orientation=sample_orientation, method='lut')    # method='splitbbox',
                 if i == 0:
                     q_p_ini = np.zeros((np.shape(x)[0], len(datas)))
                     q_z_ini = np.zeros((np.shape(y)[0], len(datas)))
@@ -100,7 +100,7 @@ def stitching(datas, ais, masks, geometry='Reflection', interp_factor=2,
                                              mask=mask,
                                              incident_angle=incident_angle,
                                              tilt_angle=tilt_angle,
-                                             sample_orientation=sample_orientation, method='lut_ocl')    #method='splitbbox', 
+                                             sample_orientation=sample_orientation, method='lut')    #method='splitbbox', 
 
                 cached_qmasks.append(np.rot90(msk, 2))       #<----------------------------------------------------------------------------------------
                 
@@ -149,7 +149,7 @@ def stitching(datas, ais, masks, geometry='Reflection', interp_factor=2,
                                           mask=mask,
                                          incident_angle=incident_angle,
                                          tilt_angle=tilt_angle,
-                                         sample_orientation=sample_orientation, method='lut_ocl')         # method='splitbbox',
+                                         sample_orientation=sample_orientation, method='lut')         # method='splitbbox',
             qimage = np.rot90(img, 2)
             # qp, qz = -x[::-1], y[::-1]
 
