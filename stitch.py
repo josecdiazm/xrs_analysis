@@ -239,8 +239,8 @@ def stitching(datas, ais, masks, geometry='Reflection', interp_factor=2,
     # Final flipud for Reflection: after accumulation in img_te the rows still
     # run qz-max at bottom to qz-min at top (because qimage was already flipped
     # per-panel above). This restores qz increasing upward for imshow.
-    if geometry == 'Reflection':
-        img = np.flipud(img)
+    # if geometry == 'Reflection':
+    #     img = np.flipud(img)
 
     qp_out = [qp_remesh.min(), qp_remesh.max()]
     qz_out = [qz_remesh.min(), qz_remesh.max()]  # both positive, 0 to qz_max
