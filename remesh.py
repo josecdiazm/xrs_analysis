@@ -78,6 +78,7 @@ def remesh_gi(data, ai, npt=None, q_h_range=None, q_v_range=None, method='splitp
         unit_oop="qoop_A^-1",
         method=method,
         mask=mask,
+        normalization_factor=1,
     )
 
     intensity, q_ip, q_oop = result
