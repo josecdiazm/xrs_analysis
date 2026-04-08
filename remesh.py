@@ -92,11 +92,14 @@ def remesh_transmission(image, ai, bins=None, q_h_range=None, q_v_range=None, ma
     if q_v_range is None:
         q_v_range = (q_v.min(), q_v.max())
 
+    dq_h = np.gradient(q_h, axis=1)  # actual per-pixel width in qx
+    dq_v = np.gradient(q_v, axis=0)  # actual per-pixel width in qy
+
     I, q_y, q_z, _, _ = splitBBox.histoBBox2d(weights=image,
                                               pos0=q_h,
-                                              delta_pos0=np.ones_like(image) * (q_h_range[1] - q_h_range[0]) / bins[0],
+                                              delta_pos0=np.abs(dq_h), #np.ones_like(image) * (q_h_range[1] - q_h_range[0]) / bins[0],
                                               pos1=q_v,
-                                              delta_pos1=np.ones_like(image) * (q_v_range[1] - q_v_range[0]) / bins[1],
+                                              delta_pos1=np.abs(dq_v), #np.ones_like(image) * (q_v_range[1] - q_v_range[0]) / bins[1],
                                               bins=bins,
                                               pos0_range=q_h_range,
                                               pos1_range=q_v_range,
