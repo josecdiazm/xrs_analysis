@@ -268,7 +268,7 @@ def translation_stitching(datas, masks=None, pys=None, pxs=None):
     for i, (data, mask, py, px) in enumerate(zip(datas, masks, pys, pxs)):
         delta_y = py - np.min(pys)
         delta_y1 = py - np.max(pys)
-        padtop = int(abs(round(delta_y/0.172))))
+        padtop = int(abs(round(delta_y/0.172)))
         padbottom = int(abs(round(delta_y1/0.172)))
 
         delta_x = px - np.min(pxs)
