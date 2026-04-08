@@ -4,7 +4,8 @@
 # %%
 
 import enum
-from pyFAI import azimuthalIntegrator
+# from pyFAI import azimuthalIntegrator
+from pyFAI.integrator.azimuthal import AzimuthalIntegrator
 from pygix import Transform
 
 import Detector, stitch, integrate1D
@@ -202,7 +203,7 @@ class xray_geometry():
 
     def calculate_integrator_trans(self, det_rots):
         self.ai = []
-        ai = azimuthalIntegrator.AzimuthalIntegrator(**{'detector': self.det,
+        ai = AzimuthalIntegrator(**{'detector': self.det,
                                                         'rot1': 0,
                                                         'rot2': 0,
                                                         'rot3': 0}
@@ -231,7 +232,7 @@ class xray_geometry():
 
     def calculate_integrator_gi2(self, det_rots):
         self.ai = []
-        ai = azimuthalIntegrator.AzimuthalIntegrator(**{'detector': self.det,
+        ai = AzimuthalIntegrator(**{'detector': self.det,
                                                         'rot1': 0,
                                                         'rot2': 0,
                                                         'rot3': 0}
