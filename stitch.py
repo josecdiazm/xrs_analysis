@@ -38,8 +38,7 @@ def stitching(datas, ais, masks, geometry='Reflection', interp_factor=2,
 
     if _cached_qranges is None:
         # -----------------------------------------------------------------------
-        # SCOUT PASS: run remesh once per image just to find the q-space extent
-        # and the per-image q-ranges needed for stitching overlap calculation.
+        # SCOUT PASS
         # -----------------------------------------------------------------------
         for i, (data, ai, mask) in enumerate(zip(datas, ais, masks)):
 
@@ -53,8 +52,9 @@ def stitching(datas, ais, masks, geometry='Reflection', interp_factor=2,
                     q_p_ini = np.zeros((np.shape(x)[0], len(datas)))
                     q_z_ini = np.zeros((np.shape(y)[0], len(datas)))
 
-                q_p_ini[:len(x), i] = x
-                q_z_ini[:len(y), i] = y
+                # Original pyGIX sign conventions
+                q_p_ini[:len(x), i] = -x[::-1]
+                q_z_ini[:len(y), i] = y[::-1]
 
             elif geometry == 'Transmission':
                 img, x, y, resc_q = remesh.remesh_transmission(data, ai, mask=mask)
@@ -90,7 +90,8 @@ def stitching(datas, ais, masks, geometry='Reflection', interp_factor=2,
             npt = (int(qp_stop - qp_start), int(np.shape(qz_remesh)[0]))
 
             if geometry == 'Reflection':
-                ip_range = (qp_remesh[qp_start], qp_remesh[qp_stop])
+                # Original pyGIX sign conventions for ip_range
+                ip_range = (-qp_remesh[qp_stop], -qp_remesh[qp_start])
                 op_range = (qz_remesh[0], qz_remesh[-1])
                 msk, _, _ = remesh.remesh_gi(mask.astype(int), ai, npt=npt,
                                              q_h_range=ip_range, q_v_range=op_range,
@@ -99,7 +100,7 @@ def stitching(datas, ais, masks, geometry='Reflection', interp_factor=2,
                                              tilt_angle=tilt_angle,
                                              sample_orientation=sample_orientation,
                                              method='splitpix')
-                cached_qmasks.append(np.flipud(msk))
+                cached_qmasks.append(np.rot90(msk, 2))
 
             elif geometry == 'Transmission':
                 ip_range = (qp_remesh[qp_start], qp_remesh[qp_stop])
@@ -111,7 +112,7 @@ def stitching(datas, ais, masks, geometry='Reflection', interp_factor=2,
 
     else:
         # -----------------------------------------------------------------------
-        # CACHED PATH: geometry hasn't changed, reuse everything from last time.
+        # CACHED PATH
         # -----------------------------------------------------------------------
         qp_remesh     = _cached_qranges['qp_remesh']
         qz_remesh     = _cached_qranges['qz_remesh']
@@ -120,7 +121,7 @@ def stitching(datas, ais, masks, geometry='Reflection', interp_factor=2,
         cached_qmasks = _cached_qranges['qmasks']
 
     # ---------------------------------------------------------------------------
-    # MAIN PASS: remesh each image onto the target q-grid and stitch.
+    # MAIN PASS
     # ---------------------------------------------------------------------------
     for i, (data, ai, mask) in enumerate(zip(datas, ais, masks)):
 
@@ -131,7 +132,8 @@ def stitching(datas, ais, masks, geometry='Reflection', interp_factor=2,
         qmask = cached_qmasks[i]
 
         if geometry == 'Reflection':
-            ip_range = (qp_remesh[qp_start], qp_remesh[qp_stop])
+            # Original pyGIX sign conventions for ip_range
+            ip_range = (-qp_remesh[qp_stop], -qp_remesh[qp_start])
             op_range = (qz_remesh[0], qz_remesh[-1])
 
             img, x, y = remesh.remesh_gi(data, ai, npt=npt,
@@ -141,7 +143,7 @@ def stitching(datas, ais, masks, geometry='Reflection', interp_factor=2,
                                          tilt_angle=tilt_angle,
                                          sample_orientation=sample_orientation,
                                          method='splitpix')
-            qimage = np.flipud(img)
+            qimage = np.rot90(img, 2)
 
         elif geometry == 'Transmission':
             ip_range = (qp_remesh[qp_start], qp_remesh[qp_stop])
