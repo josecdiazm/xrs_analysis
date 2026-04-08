@@ -3,6 +3,7 @@
 
 # %%
 
+import os
 import enum
 # from pyFAI import azimuthalIntegrator
 from pyFAI.integrator.azimuthal import AzimuthalIntegrator
