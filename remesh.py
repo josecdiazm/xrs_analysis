@@ -49,8 +49,8 @@ def remesh_gi(data, ai, npt=None, q_h_range=None, q_v_range=None, method='splitp
         fi = ai
 
     if npt is None:
-        npt_ip  = 10000
-        npt_oop = 10000
+        npt_ip  = 1500
+        npt_oop = 1500
     elif isinstance(npt, (tuple, list)):
         npt_ip, npt_oop = npt
     else:
