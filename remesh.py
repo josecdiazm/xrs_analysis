@@ -8,7 +8,7 @@ from pyFAI.integrator.fiber import FiberIntegrator
 
 
 def remesh_gi(data, ai, npt=None, q_h_range=None, q_v_range=None, method='splitpix', mask=None,
-              incident_angle=0.0, tilt_angle=0.0, sample_orientation=3):
+              incident_angle=0.0, tilt_angle=0.0, sample_orientation=1):
     """
     Redraw the Grazing-Incidence image in (qp, qz) coordinates using pyFAI FiberIntegrator.
 

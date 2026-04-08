@@ -9,7 +9,7 @@ import remesh
 
 def stitching(datas, ais, masks, geometry='Reflection', interp_factor=2,
               flag_scale=True, resc_q=False, _cached_qranges=None,
-              incident_angle=0.0, tilt_angle=0.0, sample_orientation=3):
+              incident_angle=0.0, tilt_angle=0.0, sample_orientation=1):
     '''
     Remeshing in q-space the 2D image collected by the pixel detector and stitching together
     images at different detector position (if several images).
