@@ -9,7 +9,7 @@ import remesh
 
 def stitching(datas, ais, masks, geometry='Reflection', interp_factor=2,
               flag_scale=True, resc_q=False, _cached_qranges=None,
-              incident_angle=0.0, tilt_angle=0.0, sample_orientation=3):
+              incident_angle=0.0, tilt_angle=0.0, sample_orientation=4):
     '''
     Remeshing in q-space the 2D image collected by the pixel detector and stitching together
     images at different detector position (if several images).
@@ -53,11 +53,6 @@ def stitching(datas, ais, masks, geometry='Reflection', interp_factor=2,
                     q_p_ini = np.zeros((np.shape(x)[0], len(datas)))
                     q_z_ini = np.zeros((np.shape(y)[0], len(datas)))
 
-                # NOTE on sign conventions:
-                # pyGIX returned q_par with a sign flip (hence -x[::-1] in the original).
-                # FiberIntegrator with sample_orientation=4 returns q_ip already in the
-                # correct sign convention, so we store x and y directly.
-                # If the stitched q_p_ini range appears inverted, add the -x[::-1] back.
                 q_p_ini[:len(x), i] = x
                 q_z_ini[:len(y), i] = y
 
@@ -104,10 +99,7 @@ def stitching(datas, ais, masks, geometry='Reflection', interp_factor=2,
                                              tilt_angle=tilt_angle,
                                              sample_orientation=sample_orientation,
                                              method='splitpix')
-                # NOTE: pyGIX required rot90(msk, 2) here to correct orientation.
-                # FiberIntegrator with sample_orientation=4 should not need this.
-                # If the mask appears rotated in the output, add: msk = np.rot90(msk, 2)
-                cached_qmasks.append(msk)
+                cached_qmasks.append(np.flipud(msk))
 
             elif geometry == 'Transmission':
                 ip_range = (qp_remesh[qp_start], qp_remesh[qp_stop])
@@ -149,10 +141,7 @@ def stitching(datas, ais, masks, geometry='Reflection', interp_factor=2,
                                          tilt_angle=tilt_angle,
                                          sample_orientation=sample_orientation,
                                          method='splitpix')
-            # NOTE: pyGIX required np.rot90(img, 2) here to correct orientation.
-            # FiberIntegrator with sample_orientation=4 should not need this.
-            # If the output image appears rotated, add: img = np.rot90(img, 2)
-            qimage = img
+            qimage = np.flipud(img)
 
         elif geometry == 'Transmission':
             ip_range = (qp_remesh[qp_start], qp_remesh[qp_stop])
@@ -232,17 +221,11 @@ def stitching(datas, ais, masks, geometry='Reflection', interp_factor=2,
     img = img_te / sca2
     mask_out = (img_mask.astype(bool)).astype(int)
 
-    # NOTE: pyGIX required np.flipud(img) here for Reflection geometry to put qz pointing up.
-    # FiberIntegrator with sample_orientation=4 and origin='lower' convention should already
-    # have qz pointing up. If the final image appears upside-down, add: img = np.flipud(img)
-    # and swap the sign logic in qz_out below accordingly.
+    if geometry == 'Reflection':
+        img = np.flipud(img)
 
     qp_out = [qp_remesh.min(), qp_remesh.max()]
-    qz_out = [qz_remesh.min(), qz_remesh.max()]
-
-    # NOTE: pyGIX had qz_out = [-qz_remesh.max(), -qz_remesh.min()] due to its internal
-    # sign convention. FiberIntegrator returns qoop already positive and increasing,
-    # so we store it directly. If qz appears negative in the plot, restore the old signs.
+    qz_out = [-qz_remesh.max(), -qz_remesh.min()]
 
     if resc_q:
         qp_out[:] = [v * 10 for v in qp_out]
@@ -296,6 +279,7 @@ def translation_stitching(datas, masks=None, pys=None, pxs=None):
 
 
 # %%
+
 
 
 
