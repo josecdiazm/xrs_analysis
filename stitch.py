@@ -52,7 +52,7 @@ def stitching(datas, ais, masks, geometry='Reflection', interp_factor=2,
                 # q_oop runs from negative (below horizon) to positive (above horizon).
                 # We store both directly — qz_remesh will be clamped to positive only below.
                 q_p_ini[:len(x), i] = x
-                q_z_ini[:len(y), i] = y
+                q_z_ini[:len(y), i] = - y
 
             elif geometry == 'Transmission':
                 img, x, y, resc_q = remesh.remesh_transmission(data, ai, mask=mask)
@@ -100,7 +100,9 @@ def stitching(datas, ais, masks, geometry='Reflection', interp_factor=2,
 
             if geometry == 'Reflection':
                 ip_range = (qp_remesh[qp_start], qp_remesh[qp_stop])
-                op_range = (qz_remesh[0], qz_remesh[-1])
+                op_range = (-qz_remesh[-1], -qz_remesh[0])
+                # op_range = (- qz_remesh[0], qz_remesh[-1])
+
                 msk, _, _ = remesh.remesh_gi(mask.astype(int), ai, npt=npt,
                                              q_h_range=ip_range, q_v_range=op_range,
                                              mask=mask,
@@ -142,7 +144,8 @@ def stitching(datas, ais, masks, geometry='Reflection', interp_factor=2,
 
         if geometry == 'Reflection':
             ip_range = (qp_remesh[qp_start], qp_remesh[qp_stop])
-            op_range = (qz_remesh[0], qz_remesh[-1])
+            op_range = (-qz_remesh[-1], -qz_remesh[0])
+            # op_range = (qz_remesh[0], qz_remesh[-1])
 
             img, x, y = remesh.remesh_gi(data, ai, npt=npt,
                                          q_h_range=ip_range, q_v_range=op_range,
