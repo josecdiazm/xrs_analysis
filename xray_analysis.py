@@ -219,33 +219,17 @@ class xray_geometry():
             self.ai.append(ai_temp)
 
 
-    # def calculate_integrator_gi(self, det_rots):
-    #     ai = Transform(wavelength=self.wav, detector=self.det, incident_angle=self.alphai)
-    #     ai.setFit2D(directDist=self.sdd, centerX=self.center[0], centerY=self.center[1])
-    #     ai.set_incident_angle(self.alphai)
-
-    #     for i, det_rot in enumerate(det_rots):
-    #         ai_temp = copy.deepcopy(ai)
-    #         ai_temp.rot1 = det_rot
-    #         ai_temp.set_incident_angle(self.alphai)
-    #         self.ai.append(ai_temp)
-
-
     def calculate_integrator_gi(self, det_rots):
-        """
-        Build per-panel AzimuthalIntegrators for Reflection geometry.
-        These will be promoted to FiberIntegrator inside remesh_gi() on each call.
-        Replaces the previous pyGIX Transform-based approach.
-        """
-        self.ai = []
-        ai = AzimuthalIntegrator(detector=self.det)
-        ai.setFit2D(self.sdd, self.center[0], self.center[1])
-        ai.wavelength = self.wav
+        ai = Transform(wavelength=self.wav, detector=self.det, incident_angle=self.alphai)
+        ai.setFit2D(directDist=self.sdd, centerX=self.center[0], centerY=self.center[1])
+        ai.set_incident_angle(self.alphai)
 
-        for det_rot in det_rots:
+        for i, det_rot in enumerate(det_rots):
             ai_temp = copy.deepcopy(ai)
             ai_temp.rot1 = det_rot
+            ai_temp.set_incident_angle(self.alphai)
             self.ai.append(ai_temp)
+
 
 
     def calculate_integrator_gi2(self, det_rots):
