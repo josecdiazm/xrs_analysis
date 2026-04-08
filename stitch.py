@@ -105,7 +105,7 @@ def stitching(datas, ais, masks, geometry='Reflection', interp_factor=2,
 
                 msk, _, _ = remesh.remesh_gi(mask.astype(int), ai, npt=npt,
                                              q_h_range=ip_range, q_v_range=op_range,
-                                             mask=None,
+                                             mask=np.zeros_like(mask),
                                              incident_angle=incident_angle,
                                              tilt_angle=tilt_angle,
                                              sample_orientation=sample_orientation,
