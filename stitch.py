@@ -100,8 +100,7 @@ def stitching(datas, ais, masks, geometry='Reflection', interp_factor=2,
 
             if geometry == 'Reflection':
                 ip_range = (qp_remesh[qp_start], qp_remesh[qp_stop])
-                op_range = (-qz_remesh[-1], -qz_remesh[0])
-                # op_range = (- qz_remesh[0], qz_remesh[-1])
+                op_range = ( qz_remesh[0], qz_remesh[-1])
 
                 msk, _, _ = remesh.remesh_gi(mask.astype(int), ai, npt=npt,
                                              q_h_range=ip_range, q_v_range=op_range,
@@ -111,7 +110,8 @@ def stitching(datas, ais, masks, geometry='Reflection', interp_factor=2,
                                              sample_orientation=sample_orientation,
                                              method='splitpix')
                 # flipud because FiberIntegrator returns qoop increasing downward
-                cached_qmasks.append(np.flipud(msk))
+                # cached_qmasks.append(np.flipud(msk))
+                cached_qmasks.append(msk)
 
             elif geometry == 'Transmission':
                 ip_range = (qp_remesh[qp_start], qp_remesh[qp_stop])
@@ -144,8 +144,7 @@ def stitching(datas, ais, masks, geometry='Reflection', interp_factor=2,
 
         if geometry == 'Reflection':
             ip_range = (qp_remesh[qp_start], qp_remesh[qp_stop])
-            op_range = (-qz_remesh[-1], -qz_remesh[0])
-            # op_range = (qz_remesh[0], qz_remesh[-1])
+            op_range = (qz_remesh[0], qz_remesh[-1])
 
             img, x, y = remesh.remesh_gi(data, ai, npt=npt,
                                          q_h_range=ip_range, q_v_range=op_range,
@@ -156,7 +155,9 @@ def stitching(datas, ais, masks, geometry='Reflection', interp_factor=2,
                                          method='splitpix')
             # flipud because FiberIntegrator azimuthal axis runs top-to-bottom
             # (qoop increasing downward). We want qz increasing upward.
-            qimage = np.flipud(img)
+            # qimage = np.flipud(img)
+            qimage = img 
+
 
         elif geometry == 'Transmission':
             ip_range = (qp_remesh[qp_start], qp_remesh[qp_stop])
