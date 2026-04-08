@@ -211,7 +211,7 @@ class xray_geometry():
                                                      )
 
         ai.setFit2D(self.sdd, self.center[0], self.center[1])
-        ai.set_wavelength(self.wav)
+        ai.wavelength(self.wav)
 
         for i, det_rot in enumerate(det_rots):
             ai_temp = copy.deepcopy(ai)
@@ -240,7 +240,7 @@ class xray_geometry():
                                                      )
 
         ai.setFit2D(self.sdd, self.center[0], self.center[1])
-        ai.set_wavelength(self.wav)
+        ai.wavelength(self.wav)
 
         for i, det_rot in enumerate(det_rots):
             ai_temp = copy.deepcopy(ai)
