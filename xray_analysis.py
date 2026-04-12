@@ -29,7 +29,10 @@ class xray_geometry():
                  det_angle_step=0,
                  det_angles=[],
                  alphai=0,
-                 bs_kind=None):
+                 bs_kind=None,
+                 rot2=0,
+                 rot3=0,
+                 ):
 
         self.geometry = geometry
         self.sdd = sdd
@@ -44,6 +47,8 @@ class xray_geometry():
         self.det_ini_angle = det_ini_angle
         self.det_angle_step = det_angle_step
         self.det_angles = det_angles
+        self.rot2 = rot2
+        self.rot3 = rot3
 
         self.ai = []
         self.masks = []
@@ -198,8 +203,8 @@ class xray_geometry():
         self.ai = []
         ai = AzimuthalIntegrator(**{'detector': self.det,
                                                         'rot1': 0,
-                                                        'rot2': 0,
-                                                        'rot3': 0}
+                                                        'rot2': self.rot2,
+                                                        'rot3': self.rot3}
                                                      )
 
         ai.setFit2D(self.sdd, self.center[0], self.center[1])
