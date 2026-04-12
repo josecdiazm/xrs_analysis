@@ -209,6 +209,9 @@ class xray_geometry():
 
         ai.setFit2D(self.sdd, self.center[0], self.center[1])
         ai.wavelength = self.wav
+         # Re-apply rotations AFTER setFit2D since it resets them to 0
+        ai.rot2 = self.rot2
+        ai.rot3 = self.rot3
         
         # Sanity check — print to verify setFit2D did not reset your rotations
         print(f"After setFit2D: rot1={ai.rot1:.6f}, rot2={ai.rot2:.6f}, rot3={ai.rot3:.6f}")
