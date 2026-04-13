@@ -32,8 +32,10 @@ class xray_geometry():
                  bs_kind=None,
                  rot2=0,
                  rot3=0,
+                 ai_poni=None,
                  ):
 
+        self.ai_poni = ai_poni
         self.geometry = geometry
         self.sdd = sdd
         self.wav = wav
@@ -201,23 +203,38 @@ class xray_geometry():
 
     def calculate_integrator_trans(self, det_rots):
         self.ai = []
-        ai = AzimuthalIntegrator(**{'detector': self.det,
-                                                        'rot1': 0,
-                                                        'rot2': 0,
-                                                        'rot3': 0}
-                                                     )
-
-        ai.setFit2D(self.sdd, self.center[0], self.center[1])
+        
+        # Use the calibrated ai directly instead of rebuilding from scratch
+        import copy
+        ai = copy.deepcopy(self.ai_poni)  # pass the original poni ai in
         ai.wavelength = self.wav
-        # Re-apply rotations AFTER setFit2D since it resets them to 0
-        ai.rot2 = self.rot2
-        ai.rot3 = self.rot3
-
 
         for i, det_rot in enumerate(det_rots):
             ai_temp = copy.deepcopy(ai)
             ai_temp.rot1 = det_rot
             self.ai.append(ai_temp)
+
+
+
+    # def calculate_integrator_trans(self, det_rots):
+    #     self.ai = []
+    #     ai = AzimuthalIntegrator(**{'detector': self.det,
+    #                                                     'rot1': 0,
+    #                                                     'rot2': 0,
+    #                                                     'rot3': 0}
+    #                                                  )
+
+    #     ai.setFit2D(self.sdd, self.center[0], self.center[1])
+    #     ai.wavelength = self.wav
+    #     # Re-apply rotations AFTER setFit2D since it resets them to 0
+    #     ai.rot2 = self.rot2
+    #     ai.rot3 = self.rot3
+
+
+    #     for i, det_rot in enumerate(det_rots):
+    #         ai_temp = copy.deepcopy(ai)
+    #         ai_temp.rot1 = det_rot
+    #         self.ai.append(ai_temp)
 
 
     def calculate_integrator_gi(self, det_rots):
