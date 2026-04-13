@@ -32,8 +32,10 @@ class xray_geometry():
                  bs_kind=None,
                  rot2=0,
                  rot3=0,
+                 ai_poni=None,
                  ):
 
+        self.ai_poni = ai_poni
         self.geometry = geometry
         self.sdd = sdd
         self.wav = wav
