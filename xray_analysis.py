@@ -32,10 +32,9 @@ class xray_geometry():
                  bs_kind=None,
                  rot2=0,
                  rot3=0,
-                 ai_poni=None,
                  ):
 
-        self.ai_poni = ai_poni
+ 
         self.geometry = geometry
         self.sdd = sdd
         self.wav = wav
@@ -201,46 +200,26 @@ class xray_geometry():
                 self.imgs.append(img)
 
 
-    # def calculate_integrator_trans(self, det_rots):
-    #     self.ai = []
-    #     ai = AzimuthalIntegrator(**{'detector': self.det,
-    #                                                     'rot1': 0,
-    #                                                     'rot2': 0,
-    #                                                     'rot3': 0}
-    #                                                  )
-
-    #     ai.setFit2D(self.sdd, self.center[0], self.center[1])
-    #     ai.wavelength = self.wav
-    #     # Re-apply rotations AFTER setFit2D since it resets them to 0
-    #     ai.rot2 = self.rot2
-    #     ai.rot3 = self.rot3
-
-
-    #     for i, det_rot in enumerate(det_rots):
-    #         ai_temp = copy.deepcopy(ai)
-    #         ai_temp.rot1 = det_rot
-    #         self.ai.append(ai_temp)
-
-
     def calculate_integrator_trans(self, det_rots):
         self.ai = []
-        ai = AzimuthalIntegrator(detector=self.det)
-        
-        fit2d = self.ai_poni.getFit2D()
-        ai.setFit2D(fit2d['directDist'], 
-                    fit2d['centerX'], 
-                    fit2d['centerY'],
-                    fit2d['tilt'],
-                    fit2d['tiltPlanRotation'])
-        ai.wavelength = self.wav
+        ai = AzimuthalIntegrator(**{'detector': self.det,
+                                                        'rot1': 0,
+                                                        'rot2': 0,
+                                                        'rot3': 0}
+                                                     )
 
-        # Sanity check
-        print(ai)
+        ai.setFit2D(self.sdd, self.center[0], self.center[1])
+        ai.wavelength = self.wav
+        # Re-apply rotations AFTER setFit2D since it resets them to 0
+        ai.rot2 = self.rot2
+        ai.rot3 = self.rot3
+
 
         for i, det_rot in enumerate(det_rots):
             ai_temp = copy.deepcopy(ai)
             ai_temp.rot1 = det_rot
             self.ai.append(ai_temp)
+
 
 
     def calculate_integrator_gi(self, det_rots):
