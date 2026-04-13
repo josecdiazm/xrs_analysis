@@ -32,10 +32,8 @@ class xray_geometry():
                  bs_kind=None,
                  rot2=0,
                  rot3=0,
-                 ai_poni=None,
                  ):
 
-        self.ai_poni = ai_poni
         self.geometry = geometry
         self.sdd = sdd
         self.wav = wav
@@ -201,21 +199,6 @@ class xray_geometry():
                 self.imgs.append(img)
 
 
-    def calculate_integrator_trans(self, det_rots):
-        self.ai = []
-        
-        # Use the calibrated ai directly instead of rebuilding from scratch
-        import copy
-        ai = copy.deepcopy(self.ai_poni)  # pass the original poni ai in
-        ai.wavelength = self.wav
-
-        for i, det_rot in enumerate(det_rots):
-            ai_temp = copy.deepcopy(ai)
-            ai_temp.rot1 = det_rot
-            self.ai.append(ai_temp)
-
-
-
     # def calculate_integrator_trans(self, det_rots):
     #     self.ai = []
     #     ai = AzimuthalIntegrator(**{'detector': self.det,
@@ -235,6 +218,27 @@ class xray_geometry():
     #         ai_temp = copy.deepcopy(ai)
     #         ai_temp.rot1 = det_rot
     #         self.ai.append(ai_temp)
+
+
+    def calculate_integrator_trans(self, det_rots):
+        self.ai = []
+        ai = AzimuthalIntegrator(detector=self.det)
+        
+        fit2d = self.ai_poni.getFit2D()
+        ai.setFit2D(fit2d['directDist'], 
+                    fit2d['centerX'], 
+                    fit2d['centerY'],
+                    fit2d['tilt'],
+                    fit2d['tiltPlanRotation'])
+        ai.wavelength = self.wav
+
+        # Sanity check
+        print(ai)
+
+        for i, det_rot in enumerate(det_rots):
+            ai_temp = copy.deepcopy(ai)
+            ai_temp.rot1 = det_rot
+            self.ai.append(ai_temp)
 
 
     def calculate_integrator_gi(self, det_rots):
