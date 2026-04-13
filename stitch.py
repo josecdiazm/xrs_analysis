@@ -59,6 +59,8 @@ def stitching(datas, ais, masks, geometry='Reflection', interp_factor=2,
 
             elif geometry == 'Transmission':
                 img, x, y, resc_q = remesh.remesh_transmission(data, ai, mask=mask)
+                print(f"x range: {x.min():.3f} to {x.max():.3f}")
+                print(f"y range: {y.min():.3f} to {y.max():.3f}")
                 if i == 0:
                     q_p_ini = np.zeros((np.shape(x)[0], len(datas)))
                     q_z_ini = np.zeros((np.shape(y)[0], len(datas)))
