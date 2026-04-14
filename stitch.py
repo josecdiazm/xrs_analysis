@@ -1,5 +1,6 @@
 import numpy as np
-from smi_analysis import remesh
+import remesh
+
 
 def stitching(datas, ais, masks, geometry ='Reflection', interp_factor = 2, flag_scale = True, resc_q=False):
     '''
